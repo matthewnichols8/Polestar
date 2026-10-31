@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = {text = "MIT; bundled third-party code retains its original licenses"}
 authors = [{name = "Mingyu Lee"}, {name = "Akshat Ramachandran"}, {name = "Souvik Kundu"}, {name = "Tushar Krishna"}]
 dependencies = [
-  "torch==2.7.1", "transformers==4.49.0", "accelerate==0.34.2",
+  "torch>=2.7.1,<3", "transformers==4.49.0", "accelerate==0.34.2",
   "numpy>=1.24,<3", "einops>=0.8,<0.9", "packaging>=23", "tqdm>=4.66"
 ]
 

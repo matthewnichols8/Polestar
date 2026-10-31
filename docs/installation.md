@@ -1,6 +1,10 @@
 # Installation
 
-Polestar uses Python 3.10+, PyTorch 2.7.1, Transformers 4.49.0, and Accelerate 0.34.2. Generation uses a CUDA-capable NVIDIA GPU. The models contain 7–8B parameters; provision memory for the model weights, hidden-state cache, and sequence length.
+Polestar uses Python 3.10+, PyTorch 2.7.1 or newer, Transformers 4.49.0,
+and Accelerate 0.34.2. Generation uses a CUDA-capable NVIDIA GPU. Install a
+PyTorch build that supports your GPU before installing Polestar. The models
+contain 7–8B parameters; memory use depends on the checkpoint, cache, and
+sequence length.
 
 ```bash
 python -m venv .venv
@@ -17,6 +21,7 @@ Choose dependencies for your workload:
 | LLaDA-V image generation | `python -m pip install -e '.[vision]'` |
 | Text benchmarks and code scoring | `python -m pip install -e '.[eval]'` |
 | Multimodal benchmarks | `python -m pip install -e '.[vision-eval]'` |
+| dInfer serving | `python -m pip install -e . && python -m pip install -e integrations/dinfer` |
 | CPU checks | `python -m pip install -e '.[test]'` |
 
 Text and multimodal evaluation environments can be installed separately: their harnesses pin different dependency versions. The model package is shared.

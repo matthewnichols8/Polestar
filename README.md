@@ -32,7 +32,9 @@ https://github.com/user-attachments/assets/5fc2c4c0-0985-4036-b8fd-8819079f94bd
 
 ## Method Overview
 
-**Polestar is a training-free inference framework that uses representation drift as a shared signal for sparse KV-cache calibration and early token commitment in diffusion LLMs.**
+**Polestar uses representation drift to decide which cached states to refresh
+and when to commit tokens during diffusion LLM inference. It needs no
+additional training.**
 
 - **Refresh where it matters.** Polestar-Cache locates high-drift regions and selectively updates cached representations.
 - **Commit when tokens are ready.** Polestar-Commit combines drift events with confidence to increase decoding parallelism.
@@ -112,6 +114,12 @@ python examples/image_generation.py --config configs/llada-v.json \
 
 See the [model guide](docs/models.md) for checkpoint, input, and generation settings.
 
+The [LLaDA system guide](docs/system.md) covers residual quantization, CPU
+offload, CUDA graphs, stream overlap, and dInfer. The fastest measured
+standalone preset on GB300 is
+[llada8b-cuda-graphs.json](configs/llada8b-cuda-graphs.json).
+Dream remains available through the same standalone API.
+
 <details>
 <summary><b>Python API: load a preset and generate</b></summary>
 
@@ -125,6 +133,16 @@ print(result.text)
 ```
 
 </details>
+
+## dInfer serving
+
+The optional [dInfer package](integrations/dinfer/README.md) runs
+Polestar-Cache and Polestar-Commit in a dInfer worker. Set
+`parallel_decoding="polestar", cache="polestar"`; the guide includes a complete
+serving example and a two-question GSM8K check. In a matched 16-question
+GB300 run, this path scored 12/16 and reached 383.42 warmed non-EOS tokens/s,
+versus 10/16 and 330.32 tokens/s for dInfer's threshold and prefix baseline.
+See the [measurement protocol](integrations/dinfer/README.md#measured-comparison).
 
 ## Evaluation
 
@@ -147,6 +165,7 @@ Add `--limit 0.1` to run 10% of a benchmark, or `--limit 16` to run 16 examples.
 | [Method](docs/method.md) | Polestar-Cache, Polestar-Commit, and the implementation of Algorithm 1 |
 | [Evaluation](docs/evaluation.md) | Benchmark commands, task settings, scoring, and output files |
 | [Paper results](docs/results.md) | Accuracy, TPF, TPS, and measurement definitions |
+| [LLaDA system paths](docs/system.md) | CUDA presets, cache format, and dInfer |
 
 Questions and contributions are welcome through [issues](https://github.com/gt-synergy-lab/Polestar/issues) and [pull requests](https://github.com/gt-synergy-lab/Polestar/pulls).
 

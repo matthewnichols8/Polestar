@@ -16,12 +16,10 @@
 # Modified from LLaDA repos: https://github.com/ML-GSAI/LLaDA
 
 from __future__ import annotations
-from .clustering import cluster_past_hidden_states
 import logging
 import math
 import sys
 from abc import abstractmethod
-from collections import defaultdict
 from functools import partial
 from typing import (
     Callable,
@@ -31,12 +29,12 @@ from typing import (
     NamedTuple,
     Optional,
     Sequence,
-    Set,
     Tuple,
+    Union,
     cast,
 )
+from contextlib import contextmanager
 from dataclasses import dataclass, fields
-from typing import List, Optional, Tuple, Union
 import torch
 import torch.backends.cuda
 import torch.nn as nn
@@ -45,7 +43,6 @@ from torch import einsum
 from transformers import PreTrainedModel
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.models.auto import AutoModel
-from transformers.cache_utils import Cache
 
 from .configuration_llada import (
     LLaDAConfig,
@@ -57,7 +54,15 @@ from .configuration_llada import (
     ModelConfig,
     ActivationCheckpointingStrategy,
 )
-from einops import rearrange
+from .system_cache import (
+    apply_state_patching,
+    build_cluster_update_packet,
+    compute_token_drift_kl,
+    initialize_clustered_hidden_state,
+    initialize_clustered_hidden_state_with_offload,
+)
+from .triton_rope import apply_rotary, triton as rope_triton
+from .cuda_graph import CapturedCall
 
 if sys.version_info.minor > 8:
     from collections.abc import MutableMapping
@@ -85,7 +90,55 @@ __all__ = [
 
 log = logging.getLogger(__name__)
 
-@torch.compile()
+_SYSTEM_TIMING_ENABLED = False
+_SYSTEM_TIMING_RECORDS = []
+_SYSTEM_TIMING_CONTEXT = {}
+
+
+def configure_system_timing(enabled: bool, *, reset: bool = False):
+    """Enable CUDA-event timing for the existing systems-backend ranges."""
+    global _SYSTEM_TIMING_ENABLED
+    _SYSTEM_TIMING_ENABLED = enabled
+    if reset:
+        _SYSTEM_TIMING_RECORDS.clear()
+
+
+def set_system_profile_context(**context):
+    _SYSTEM_TIMING_CONTEXT.clear()
+    _SYSTEM_TIMING_CONTEXT.update(context)
+
+
+def collect_system_timing(*, synchronize: bool = True):
+    if synchronize and torch.cuda.is_available():
+        torch.cuda.synchronize()
+    records = []
+    for name, context, start, end in _SYSTEM_TIMING_RECORDS:
+        records.append(
+            {
+                "name": name,
+                **context,
+                "gpu_ms": start.elapsed_time(end),
+            }
+        )
+    return records
+
+
+@contextmanager
+def gpu_timing_range(name: str, enabled: bool = True):
+    timing = _SYSTEM_TIMING_ENABLED and enabled and torch.cuda.is_available()
+    if timing:
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        start.record(torch.cuda.current_stream())
+    try:
+        yield
+    finally:
+        if timing:
+            end.record(torch.cuda.current_stream())
+            _SYSTEM_TIMING_RECORDS.append(
+                (name, dict(_SYSTEM_TIMING_CONTEXT), start, end)
+            )
+
 def scaled_dot_product_attention(q, k, v, mask=None, attn_mask=None, dropout_p=0.0, is_causal=False):
     return F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, dropout_p=dropout_p, is_causal=is_causal)
 
@@ -99,10 +152,10 @@ class ModuleType(StrEnum):
 class LLaDACausalLMOutput(CausalLMOutputWithPast):
     past_hidden_states: Optional[List[torch.Tensor]] = None
     clustered_hidden_states: Optional[List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]] = None
-
+    # token_importance_scores: Optional[List[torch.Tensor]] = None
     drift_scores: Optional[List[torch.Tensor]] = None
-    logits_sel: Optional[torch.FloatTensor]=None
-    sel_indices:Optional[torch.FloatTensor]=None
+    logits_sel: Optional[torch.FloatTensor] = None
+    sel_indices: Optional[torch.FloatTensor] = None
 
 def init_weights(
     config: ModelConfig,
@@ -149,16 +202,17 @@ def init_weights(
             cutoff_factor = 3
 
         if type_of_module == ModuleType.in_module:
-
+            # for att_proj (same as QKV), ff_proj
             std = config.init_std
         elif type_of_module == ModuleType.out_module:
-
+            # for attn_out, ff_out
             std = config.init_std / math.sqrt(2.0 * config.n_layers)
         elif type_of_module == ModuleType.emb:
-
+            # positional embeddings (wpe)
+            # token embeddings (wte)
             std = config.init_std
         elif type_of_module == ModuleType.final_out:
-
+            # final output (ff_out)
             std = config.d_model**-0.5
         else:
             raise RuntimeError(f"Unknown module type '{type_of_module}'")
@@ -180,6 +234,7 @@ def init_weights(
             with torch.no_grad():
                 module.weight.div_(math.sqrt(2 * config.n_layers))
 
+
 def ensure_finite_(x: torch.Tensor, check_neg_inf: bool = True, check_pos_inf: bool = False):
     """
     Modify ``x`` in place to replace ``float("-inf")`` with the minimum value of the dtype when ``check_neg_inf``
@@ -189,6 +244,7 @@ def ensure_finite_(x: torch.Tensor, check_neg_inf: bool = True, check_pos_inf: b
         x.masked_fill_(x == float("-inf"), torch.finfo(x.dtype).min)
     if check_pos_inf:
         x.masked_fill_(x == float("inf"), torch.finfo(x.dtype).max)
+
 
 def activation_checkpoint_function(cfg: ModelConfig):
     preserve_rng_state = (
@@ -202,6 +258,7 @@ def activation_checkpoint_function(cfg: ModelConfig):
         use_reentrant=False,
     )
 
+
 class BufferCache(dict, MutableMapping[str, torch.Tensor]):
     """
     Cache for attention biases and other things that would normally be stored as buffers.
@@ -212,11 +269,13 @@ class BufferCache(dict, MutableMapping[str, torch.Tensor]):
     NaNs when they're synchronized due to casting or some other issue.
     """
 
+
 def _non_meta_init_device(config: ModelConfig) -> torch.device:
     if config.init_device is not None and config.init_device != "meta":
         return torch.device(config.init_device)
     else:
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class Dropout(nn.Dropout):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -224,6 +283,7 @@ class Dropout(nn.Dropout):
             return input
         else:
             return F.dropout(input, self.p, self.training, self.inplace)
+
 
 class LayerNormBase(nn.Module):
     def __init__(
@@ -269,7 +329,9 @@ class LayerNormBase(nn.Module):
             raise NotImplementedError(f"Unknown LayerNorm type: '{config.layer_norm_type}'")
 
     def _cast_if_autocast_enabled(self, tensor: torch.Tensor, dtype: Optional[torch.dtype] = None) -> torch.Tensor:
-
+        # NOTE: `is_autocast_enabled()` only checks for CUDA autocast, so we use the separate function
+        # `is_autocast_cpu_enabled()` for CPU autocast.
+        # See https://github.com/pytorch/pytorch/issues/110966.
         if tensor.device.type == "cuda" and torch.is_autocast_enabled():
             return tensor.to(dtype=dtype if dtype is not None else torch.get_autocast_gpu_dtype())
         elif tensor.device.type == "cpu" and torch.is_autocast_cpu_enabled():
@@ -282,6 +344,7 @@ class LayerNormBase(nn.Module):
             torch.nn.init.ones_(self.weight)  # type: ignore
         if self.bias is not None:
             torch.nn.init.zeros_(self.bias)  # type: ignore
+
 
 class LayerNorm(LayerNormBase):
     """
@@ -314,6 +377,7 @@ class LayerNorm(LayerNormBase):
         else:
             return F.layer_norm(x, self.normalized_shape, weight=self.weight, bias=self.bias, eps=self.eps)
 
+
 class RMSLayerNorm(LayerNormBase):
     """
     RMS layer norm, a simplified :class:`LayerNorm` implementation
@@ -329,20 +393,21 @@ class RMSLayerNorm(LayerNormBase):
         super().__init__(config, size=size, elementwise_affine=elementwise_affine, eps=config.rms_norm_eps)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.weight is not None and self.weight.dtype != x.dtype:
+            with torch.autocast(enabled=False, device_type=x.device.type):
+                original_dtype = x.dtype
+                values = x.float()
+                values = (values * torch.rsqrt(values.pow(2).mean(-1, keepdim=True) + self.eps)).to(original_dtype)
+            values = self.weight * values
+            return values + self.bias if self.bias is not None else values
         with torch.autocast(enabled=False, device_type=x.device.type):
-            og_dtype = x.dtype
-            x = x.to(torch.float32)
-            variance = x.pow(2).mean(-1, keepdim=True)
-            x = x * torch.rsqrt(variance + self.eps)
-            x = x.to(og_dtype)
-
+            original_dtype = x.dtype
+            values = x.float()
+            values = (values * torch.rsqrt(values.pow(2).mean(-1, keepdim=True) + self.eps)).to(original_dtype)
         if self.weight is not None:
-            if self.bias is not None:
-                return self.weight * x + self.bias
-            else:
-                return self.weight * x
-        else:
-            return x
+            values = self.weight * values
+        return values + self.bias if self.bias is not None else values
+
 
 class GemmaRMSLayerNorm(LayerNormBase):
     """
@@ -374,6 +439,7 @@ class GemmaRMSLayerNorm(LayerNormBase):
         else:
             return x
 
+
 class RotaryEmbedding(nn.Module):
     """
     [Rotary positional embeddings (RoPE)](https://arxiv.org/abs/2104.09864).
@@ -383,7 +449,7 @@ class RotaryEmbedding(nn.Module):
         super().__init__()
         self.config = config
         self.__cache = cache
-
+        # Warm up cache.
         self.rope_theta = config.rope_theta
         self.get_rotary_embedding(config.max_sequence_length, _non_meta_init_device(config))
 
@@ -422,14 +488,27 @@ class RotaryEmbedding(nn.Module):
     def apply_rotary_pos_emb(self, pos_sin: torch.Tensor, pos_cos: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         return ((t * pos_cos) + (self.rotate_half(t) * pos_sin)).to(t.dtype)
 
-    def forward(self, q: torch.Tensor, k: torch.Tensor, block_end_index: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, q: torch.Tensor, k: torch.Tensor, block_end_index: Optional[int | torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        if q.is_cuda and not torch.is_grad_enabled() and rope_triton is not None:
+            query_len, key_len = q.shape[-2], k.shape[-2]
+            block_end = (
+                key_len if block_end_index is None
+                else block_end_index if isinstance(block_end_index, int)
+                else block_end_index.item()
+            )
+            sin, cos = self.get_rotary_embedding(key_len, q.device)
+            return (
+                apply_rotary(q, sin, cos, position_start=block_end - query_len,
+                             full_precision=self.config.rope_full_precision),
+                apply_rotary(k, sin, cos, full_precision=self.config.rope_full_precision),
+            )
         if self.config.rope_full_precision:
             q_, k_ = q.float(), k.float()
         else:
             q_, k_ = q, k
 
         with torch.autocast(q.device.type, enabled=False):
-            query_len, key_len = q_.shape[-2], k_.shape[-2]
+            query_len, key_len = q_.shape[-2], k_.shape[-2]  # could be different if layer_past not None
             pos_sin, pos_cos = self.get_rotary_embedding(key_len, q_.device)
             pos_sin = pos_sin.type_as(q_)
             pos_cos = pos_cos.type_as(q_)
@@ -440,9 +519,10 @@ class RotaryEmbedding(nn.Module):
                     q_,
                 )
             else:
+                block_end = block_end_index if isinstance(block_end_index, int) else block_end_index.item()
                 q_ = self.apply_rotary_pos_emb(
-                    pos_sin[:, :, block_end_index.item() - query_len : block_end_index.item(), :],
-                    pos_cos[:, :, block_end_index.item() - query_len : block_end_index.item(), :],
+                    pos_sin[:, :, block_end - query_len : block_end, :],
+                    pos_cos[:, :, block_end - query_len : block_end, :],
                     q_,
                 )
             k_ = self.apply_rotary_pos_emb(pos_sin, pos_cos, k_)
@@ -455,6 +535,10 @@ class RotaryEmbedding(nn.Module):
         key_len: L_total
         returns: q_rot (B, nh, S, hs)
         """
+        if q.is_cuda and not torch.is_grad_enabled() and rope_triton is not None:
+            sin, cos = self.get_rotary_embedding(key_len, q.device)
+            return apply_rotary(q, sin, cos, positions=positions,
+                                full_precision=self.config.rope_full_precision)
         if self.config.rope_full_precision:
             q_ = q.float()
         else:
@@ -465,6 +549,7 @@ class RotaryEmbedding(nn.Module):
             pos_sin = pos_sin.type_as(q_)
             pos_cos = pos_cos.type_as(q_)
 
+            # gather (1,1,S,hs)
             pos = positions.to(device=q_.device)
             sin_sel = pos_sin[:, :, pos, :]
             cos_sel = pos_cos[:, :, pos, :]
@@ -472,6 +557,8 @@ class RotaryEmbedding(nn.Module):
             q_ = self.apply_rotary_pos_emb(sin_sel, cos_sel, q_)
 
         return q_.type_as(q)
+
+
 
 class Activation(nn.Module):
     def __init__(self, config: ModelConfig):
@@ -500,10 +587,12 @@ class Activation(nn.Module):
         else:
             raise NotImplementedError(f"Unknown activation: '{config.activation_type}'")
 
+
 class GELU(nn.GELU):
     @property
     def output_multiplier(self) -> float:
         return 1.0
+
 
 class ReLU(nn.ReLU):
     @property
@@ -524,6 +613,7 @@ class SwiGLU(Activation):
     def output_multiplier(self) -> float:
         return 0.5
 
+
 def causal_attention_bias(seq_len: int, device: torch.device) -> torch.FloatTensor:
     att_bias = torch.triu(
         torch.ones(seq_len, seq_len, device=device, dtype=torch.float),
@@ -531,6 +621,7 @@ def causal_attention_bias(seq_len: int, device: torch.device) -> torch.FloatTens
     )
     att_bias.masked_fill_(att_bias == 1, torch.finfo(att_bias.dtype).min)
     return att_bias.view(1, 1, seq_len, seq_len)  # type: ignore
+
 
 def get_causal_attention_bias(cache: BufferCache, seq_len: int, device: torch.device) -> torch.Tensor:
     if (causal_bias := cache.get("causal_attention_bias")) is not None and causal_bias.shape[-1] >= seq_len:
@@ -543,16 +634,21 @@ def get_causal_attention_bias(cache: BufferCache, seq_len: int, device: torch.de
     cache["causal_attention_bias"] = causal_bias
     return causal_bias
 
+
 def alibi_attention_bias(seq_len: int, config: ModelConfig, device: torch.device) -> torch.FloatTensor:
     alibi_bias = torch.arange(1 - seq_len, 1, dtype=torch.float, device=device).view(1, 1, 1, seq_len)
 
+    # shape: (1, 1, seq_len, seq_len)
     alibi_bias = alibi_bias - torch.arange(1 - seq_len, 1, dtype=torch.float, device=device).view(1, 1, seq_len, 1)
     alibi_bias.abs_().mul_(-1)
 
+    # shape: (n_heads,)
     m = torch.arange(1, config.n_heads + 1, dtype=torch.float, device=device)
     m.mul_(config.alibi_bias_max / config.n_heads)
 
+    # shape: (1, n_heads, seq_len, seq_len)
     return alibi_bias * (1.0 / (2 ** m.view(1, config.n_heads, 1, 1)))  # type: ignore
+
 
 class LLaDABlock(nn.Module):
     """
@@ -571,8 +667,10 @@ class LLaDABlock(nn.Module):
 
         self._activation_checkpoint_fn = None
 
+        # Dropout.
         self.dropout = Dropout(config.residual_dropout)
 
+        # Layer norms.
         self.k_norm: Optional[LayerNormBase] = None
         self.q_norm: Optional[LayerNormBase] = None
         if config.attention_layer_norm:
@@ -583,13 +681,16 @@ class LLaDABlock(nn.Module):
             )
             self.q_norm = LayerNormBase.build(config, elementwise_affine=config.attention_layer_norm_with_affine)
 
+        # Activation function.
         self.act = Activation.build(config)
         assert (self.act.output_multiplier * self.hidden_size) % 1 == 0
 
+        # Attention output projection.
         self.attn_out = nn.Linear(
             config.d_model, config.d_model, bias=config.include_bias, device=config.init_device
         )
 
+        # Feed-forward output projection.
         self.ff_out = nn.Linear(
             int(self.act.output_multiplier * self.hidden_size),
             config.d_model,
@@ -598,6 +699,7 @@ class LLaDABlock(nn.Module):
         )
         self.ff_out._is_residual = True  # type: ignore
 
+        # Rotary embeddings.
         if self.config.rope:
             self.rotary_emb = RotaryEmbedding(config, self.__cache)
 
@@ -639,7 +741,9 @@ class LLaDABlock(nn.Module):
     @classmethod
     def _cast_attn_bias(cls, bias: torch.Tensor, input_dtype: torch.dtype) -> torch.Tensor:
         target_dtype = input_dtype
-
+        # NOTE: `is_autocast_enabled()` only checks for CUDA autocast, so we use the separate function
+        # `is_autocast_cpu_enabled()` for CPU autocast.
+        # See https://github.com/pytorch/pytorch/issues/110966.
         if bias.device.type == "cuda" and torch.is_autocast_enabled():
             target_dtype = torch.get_autocast_gpu_dtype()
         elif bias.device.type == "cpu" and torch.is_autocast_cpu_enabled():
@@ -651,9 +755,9 @@ class LLaDABlock(nn.Module):
 
     def _scaled_dot_product_attention(
         self,
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
+        q: torch.Tensor,  # (B,H,Tq,hs)
+        k: torch.Tensor,  # (B,H,Tk,hs)
+        v: torch.Tensor,  # (B,H,Tk,hs)
         attn_mask: Optional[torch.Tensor] = None,
         dropout_p: float = 0.0,
         is_causal: bool = False,
@@ -668,6 +772,7 @@ class LLaDABlock(nn.Module):
             attn_weight = F.softmax(attn_weight, dim=-1)
         return out, attn_weight
 
+
     def attention(
         self,
         q: torch.Tensor,
@@ -679,16 +784,22 @@ class LLaDABlock(nn.Module):
         use_cache: bool = False,
         replace_position: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
+        cache_range: Optional[Tuple[int, int]] = None,
+        proxy_ready_event: Optional[torch.cuda.Event] = None,
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
-        B, T, C = q.size()
+        B, T, C = q.size()  # batch size, sequence length, d_model
         dtype = k.dtype
 
-        if self.q_norm is not None and self.k_norm is not None:
+        # Optionally apply layer norm to keys and queries.
+        if self.q_norm is not None and self.k_norm is not None: #self.q_norm: None, self.k_norm: None
             q = self.q_norm(q).to(dtype=dtype)
             k = self.k_norm(k).to(dtype=dtype)
 
+        # Move head forward to be next to the batch dim.
+        # shape: (B, nh, T, hs)
+        # self.config.n_heads: 32
         q = q.view(B, T, self.config.n_heads, C // self.config.n_heads).transpose(1, 2)
-
+        # k, v: (B, n_kv_h, T, hs)
         k = k.view(B, T, self.config.effective_n_kv_heads, C // self.config.n_heads).transpose(1, 2)
         v = v.view(B, T, self.config.effective_n_kv_heads, C // self.config.n_heads).transpose(1, 2)
 
@@ -698,24 +809,36 @@ class LLaDABlock(nn.Module):
                 k = torch.cat((past_key, k), dim=-2)
                 v = torch.cat((past_value, v), dim=-2)
             else:
+                # k shape is [B, n_kv_h, selected_length, hs]
+                # replace_position shape is [B, L], where L contains 0s and 1s, 0 means no replacement, 1 means replace, with selected_length number of 1s
+                # past_key shape is [B, n_kv_h, L, hs]
+                # Replace selected_length number of 1s in past_key with k
 
-                B_rep = replace_position.shape[0]
-                for batch_idx in range(B_rep):
-                    batch_replace_indices = replace_position[batch_idx].nonzero(as_tuple=True)[0]
-                    if len(batch_replace_indices) > 0:
-                        past_key[batch_idx, :, batch_replace_indices] = k[batch_idx, :, : len(batch_replace_indices)]
-                        past_value[batch_idx, :, batch_replace_indices] = v[batch_idx, :, : len(batch_replace_indices)]
+                # Handle batched replace_position correctly
+                if cache_range is not None:
+                    start, end = cache_range
+                    if k.shape[-2] != end - start:
+                        raise ValueError("cache replacement length does not match cache_range")
+                    past_key[:, :, start:end, :] = k
+                    past_value[:, :, start:end, :] = v
+                else:
+                    B_rep = replace_position.shape[0]
+                    for batch_idx in range(B_rep):
+                        batch_replace_indices = replace_position[batch_idx].nonzero(as_tuple=True)[0]
+                        if len(batch_replace_indices) > 0:
+                            past_key[batch_idx, :, batch_replace_indices] = k[batch_idx, :, : len(batch_replace_indices)]
+                            past_value[batch_idx, :, batch_replace_indices] = v[batch_idx, :, : len(batch_replace_indices)]
                 k = past_key
                 v = past_value
 
         present = (k, v) if use_cache else None
-        query_len, key_len = q.shape[-2], k.shape[-2]
+        query_len, key_len = q.shape[-2], k.shape[-2]  # could be different if layer_past not None
 
         rope_k=None
-
+        # RoPE
         if self.config.rope :
             if layer_past is not None and replace_position is not None:
-                max_replace_pos = (
+                max_replace_pos = cache_range[1] if cache_range is not None else (
                     replace_position.nonzero(as_tuple=True)[1].max() + 1 if replace_position.any() else key_len
                 )
                 q, k = self.rotary_emb(q, k, max_replace_pos)
@@ -723,13 +846,21 @@ class LLaDABlock(nn.Module):
                 q, k = self.rotary_emb(q, k)
             rope_k = k
 
-        if attention_bias is not None:
+        if proxy_ready_event is not None:
+            proxy_ready_event.record(torch.cuda.current_stream(q.device))
 
+        if attention_bias is not None:
+            # Resize and cast attention bias.
+            # The current dtype of the attention bias might not match the dtype that the SDP attn function will
+            # run in if AMP is enabled, and this can be a problem if some tokens are masked out due to padding
+            # as down-casting the attention bias to the autocast precision will result in -infs, which will
+            # cause the SDP attn function to produce NaNs.
             attention_bias = self._cast_attn_bias(
                 attention_bias[:, :, key_len - query_len : key_len, :key_len],
                 dtype,
             )
-
+        # Get the attention scores.
+        # shape: (B, nh, T, hs)
         att, attn_weight = self._scaled_dot_product_attention(
             q,
             k,
@@ -739,12 +870,14 @@ class LLaDABlock(nn.Module):
             is_causal=False,
             output_attentions=output_attentions
         )
-
+        # Re-assemble all head outputs side-by-side.
         att = att.transpose(1, 2).contiguous().view(B, T, C)
-
+        # output projection
         att = self.attn_out(att)
 
+        # Apply output projection.
         return att, present, attn_weight, rope_k
+
 
     @abstractmethod
     def forward(
@@ -760,6 +893,12 @@ class LLaDABlock(nn.Module):
         topk: Optional[int] = None,
         efficient: Optional[bool] = False,
         get_token_drift_score: bool = False,
+        use_cluster: bool = True,
+        enable_quantization: bool = False,
+        quantization_precision: str = "fp4",
+        enable_overlap: bool = False,
+        prefetched_h_old_raw: Optional[torch.Tensor] = None,
+        block_range: Optional[Tuple[int, int]] = None,
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]], Optional[torch.Tensor], Optional[torch.Tensor]]:
         raise NotImplementedError
 
@@ -772,6 +911,7 @@ class LLaDABlock(nn.Module):
         else:
             raise NotImplementedError(f"Unknown block type: '{config.block_type}'")
 
+
 class LLaDASequentialBlock(LLaDABlock):
     """
     This is a typical transformer block where the output is computed as ``MLP(LN(x + Attention(LN(x))))``
@@ -780,10 +920,10 @@ class LLaDASequentialBlock(LLaDABlock):
 
     def __init__(self, layer_id: int, config: ModelConfig, cache: BufferCache):
         super().__init__(layer_id, config, cache)
-
+        # Layer norms.
         self.attn_norm = LayerNorm.build(config)
         self.ff_norm = LayerNorm.build(config)
-
+        # Attention input projection. Projects x -> (q, k, v)
         head_dim = config.d_model // config.n_heads
         self.fused_dims = (
             config.d_model,
@@ -793,7 +933,7 @@ class LLaDASequentialBlock(LLaDABlock):
         self.att_proj = nn.Linear(
             config.d_model, sum(self.fused_dims), bias=config.include_bias | config.include_qkv_bias, device=config.init_device
         )
-
+        # Feed-forward input projection.
         self.ff_proj = nn.Linear(
             config.d_model, self.hidden_size, bias=config.include_bias, device=config.init_device
         )
@@ -802,7 +942,7 @@ class LLaDASequentialBlock(LLaDABlock):
         super().reset_parameters()
         self.attn_norm.reset_parameters()
         self.ff_norm.reset_parameters()
-
+        # NOTE: the standard deviation for these weights does not depend on the layer.
         init_weights(
             self.config, self.att_proj, d=self.config.d_model, layer_id=None, type_of_module=ModuleType.in_module
         )
@@ -821,7 +961,13 @@ class LLaDASequentialBlock(LLaDABlock):
     ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]], Optional[torch.Tensor], Optional[object]]:
 
         current_hidden_state = x if use_cache else None
-
+        # Get query, key, value projections.
+        # shape:
+        #  - for regular attn q, k, v: (batch_size, seq_len, d_model)
+        #  - for multi-query attn q: (batch_size, seq_len, d_model)
+        #                      k, v: (batch_size, seq_len, d_model // n_heads)
+        #  - for group query attn q: (batch_size, seq_len, d_model)
+        #                      k, v: (batch_size, seq_len, d_model // n_kv_heads)
         if self._activation_checkpoint_fn is not None:
             q, k, v = self.att_proj(self._activation_checkpoint_fn(self.attn_norm, x)).split(
                 self.fused_dims, dim=-1
@@ -829,6 +975,8 @@ class LLaDASequentialBlock(LLaDABlock):
         else:
             q, k, v = self.att_proj(self.attn_norm(x)).split(self.fused_dims, dim=-1)
 
+
+        # Get attention scores.
         if self._activation_checkpoint_fn is not None:
             att, cache = self._activation_checkpoint_fn(  # type: ignore
                 self.attention,
@@ -849,8 +997,12 @@ class LLaDASequentialBlock(LLaDABlock):
                 use_cache=use_cache,
             )
 
+        # Add attention scores.
+        # shape: (B, T, C)
         x = x + self.dropout(att)
 
+        # Add feed-forward projection.
+        # shape: (batch_size, seq_len, d_model)
         og_x = x
         if self._activation_checkpoint_fn is not None:
             x = self._activation_checkpoint_fn(self.ff_norm, x)  # type: ignore
@@ -867,6 +1019,7 @@ class LLaDASequentialBlock(LLaDABlock):
 
         return x, cache, current_hidden_state
 
+
 class LLaDALlamaBlock(LLaDABlock):
     """
     This is a transformer block where the output is computed as ``MLP(LN(x + Attention(LN(x))))``
@@ -877,11 +1030,12 @@ class LLaDALlamaBlock(LLaDABlock):
 
     def __init__(self, layer_id: int, config: ModelConfig, cache: BufferCache):
         super().__init__(layer_id, config, cache)
-
+        # Layer norms.
         self.attn_norm = LayerNorm.build(config)
         self.ff_norm = LayerNorm.build(config)
         self.__cache = cache
 
+        # Attention input projection. Projects x -> (q, k, v)
         head_dim = config.d_model // config.n_heads
         q_proj_out_dim = config.d_model
         k_proj_out_dim = config.effective_n_kv_heads * head_dim
@@ -896,19 +1050,68 @@ class LLaDALlamaBlock(LLaDABlock):
             config.d_model, v_proj_out_dim, bias=config.include_bias | config.include_qkv_bias, device=config.init_device
         )
 
+        # Feed-forward input projection.
         self.ff_proj = nn.Linear(
             config.d_model, self.hidden_size, bias=config.include_bias, device=config.init_device
         )
-
+        # Gated MLP branch.
         self.up_proj = nn.Linear(
             config.d_model, self.hidden_size, bias=config.include_bias, device=config.init_device
+        )
+        self._quant_offload_state = None
+        self._step0_stream = None
+        self._proxy_stream = None
+        self._qkv_graph: Optional[CapturedCall] = None
+        self._ffn_graph: Optional[CapturedCall] = None
+        self._centroid_q_graph: Optional[CapturedCall] = None
+
+    def _project_qkv(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        normalized = self.attn_norm(x)
+        return self.q_proj(normalized), self.k_proj(normalized), self.v_proj(normalized)
+
+    def _project_centroid_q(self, centroids: torch.Tensor) -> torch.Tensor:
+        return self.q_proj(self.attn_norm(centroids))
+
+    def _feed_forward(self, residual: torch.Tensor) -> torch.Tensor:
+        normalized = self.ff_norm(residual)
+        gate = self.ff_proj(normalized)
+        up = self.up_proj(normalized)
+        return residual + self.dropout(self.ff_out(self.act(gate) * up))
+
+    def prepare_decode_graph(self, block_length: int) -> None:
+        if self.training or self._activation_checkpoint_fn is not None:
+            raise ValueError("FFN graph capture requires an eval model without activation checkpointing")
+        weight = self.ff_proj.weight
+        if weight.device.type != "cuda":
+            raise ValueError("FFN graph capture requires CUDA weights")
+        self._qkv_graph = CapturedCall(
+            self._project_qkv,
+            length=block_length,
+            width=self.config.d_model,
+            device=weight.device,
+            dtype=weight.dtype,
+        )
+        self._ffn_graph = CapturedCall(
+            self._feed_forward,
+            length=block_length,
+            width=self.config.d_model,
+            device=weight.device,
+            dtype=weight.dtype,
+            clone_output=True,
+        )
+        self._centroid_q_graph = CapturedCall(
+            self._project_centroid_q,
+            length=8,
+            width=self.config.d_model,
+            device=weight.device,
+            dtype=weight.dtype,
         )
 
     def reset_parameters(self):
         super().reset_parameters()
         self.attn_norm.reset_parameters()
         self.ff_norm.reset_parameters()
-
+        # NOTE: the standard deviation for these weights does not depend on the layer.
         init_weights(self.config, self.q_proj, d=self.config.d_model, layer_id=None)
         init_weights(self.config, self.k_proj, d=self.config.d_model, layer_id=None)
         init_weights(self.config, self.v_proj, d=self.config.d_model, layer_id=None)
@@ -932,6 +1135,11 @@ class LLaDALlamaBlock(LLaDABlock):
         efficient: Optional[bool] = False,
         get_token_drift_score: bool = False,
         use_cluster: bool = True,
+        enable_quantization: bool = False,
+        quantization_precision: str = "fp4",
+        enable_overlap: bool = False,
+        prefetched_h_old_raw: Optional[torch.Tensor] = None,
+        block_range: Optional[Tuple[int, int]] = None,
     ) -> Tuple[
         torch.Tensor,
         Optional[Tuple[torch.Tensor, torch.Tensor]],
@@ -939,351 +1147,323 @@ class LLaDALlamaBlock(LLaDABlock):
         Optional[Tuple[torch.Tensor, torch.Tensor]],
         Optional[Tuple[torch.Tensor, torch.Tensor]],
     ]:
-
-        idx = None
-
         if layer_id == self.config.n_layers - 1:
             topk = 1
-        window_replace_postion = torch.zeros_like(replace_position) if replace_position is not None else None
-        window_size = int(replace_position[0].sum().item()) if replace_position is not None else 32
-        local_q_start = None
-        local_q_end = None
-        current_hidden_state = None
-
-        if update_packet_prev is not None and hidden_state_past is not None and cluster and use_cluster:
-            idx_raw, h_new_raw = update_packet_prev
-            if clustered_hidden_state is not None:
-                _, current_labels, _ = clustered_hidden_state
-                active_mask = (current_labels[0, idx_raw] != -1)
-
-                idx = idx_raw[active_mask]
-                h_new = h_new_raw[:, active_mask, :]
-            else:
-                idx = idx_raw
-                h_new = h_new_raw
-            idx = idx.to(hidden_state_past.device)
-
-            hidden_state_past = hidden_state_past.clone()
-            h_old = hidden_state_past[:, idx, :].clone()
-            hidden_state_past[:, idx, :] = h_new
-
-            if layer_past is not None:
-                past_key, past_value = layer_past
-                head_dim = self.config.d_model // self.config.n_heads
-                n_kv_h = self.config.effective_n_kv_heads
-
-                h_new_norm = self.attn_norm(h_new_raw)
-                k_new = self.k_proj(h_new_norm)
-                v_new = self.v_proj(h_new_norm)
-
-                B_sz, S_sz, _ = k_new.shape
-                k_new = k_new.view(B_sz, S_sz, n_kv_h, head_dim).transpose(1, 2)
-                v_new = v_new.view(B_sz, S_sz, n_kv_h, head_dim).transpose(1, 2)
-
-                past_key = past_key.clone()
-                past_value = past_value.clone()
-
-                past_key[:, :, idx_raw, :] = k_new
-                past_value[:, :, idx_raw, :] = v_new
-
-                layer_past = (past_key, past_value)
-
-            if clustered_hidden_state is not None:
-                centroids, labels, counts = clustered_hidden_state
-
-                B_c, K, D_c = centroids.shape
-                _, L_total = labels.shape
-                assert B_c == h_old.shape[0], "Batch size mismatch between centroids and hidden states"
-
-                cluster_total_counts = counts
-
-                labels_sel = labels[:, idx]
-                valid_sel_mask = (labels_sel >= 0) & (labels_sel < K)
-                safe_labels_sel = labels_sel.clamp(min=0)
-
-                labels_sel_onehot = F.one_hot(safe_labels_sel, num_classes=K).to(
-                    dtype=centroids.dtype
-                )
-                labels_sel_onehot = labels_sel_onehot * valid_sel_mask.unsqueeze(-1)
-
-                sum_old = torch.einsum("bsk,bsd->bkd", labels_sel_onehot, h_old.to(centroids.dtype))
-                sum_new = torch.einsum("bsk,bsd->bkd", labels_sel_onehot, h_new.to(centroids.dtype))
-
-                delta = sum_new - sum_old
-
-                eps = 1e-6
-
-                denom = cluster_total_counts + eps
-                valid_mask_c = cluster_total_counts > 0
-
-                centroids_update = centroids + delta / denom
-                centroids = torch.where(valid_mask_c, centroids_update, centroids)
-                clustered_hidden_state = (centroids, labels, counts)
+        if block_range is None and replace_position is not None:
+            block_pos = replace_position[0].nonzero(as_tuple=True)[0]
+            block_range = (block_pos[0].item(), block_pos[-1].item() + 1)
+        window_size = block_range[1] - block_range[0] if block_range is not None else 32
+        attention_replace_position = replace_position
+        attention_cache_range = block_range
+        local_q_start = local_q_end = None
         if (
-            use_cache
-            and use_cluster
-            and hidden_state_past is None
-            and clustered_hidden_state is None
+            efficient
             and replace_position is not None
+            and x.size(1) < replace_position.size(1)
+        ):
+            block_start, block_end = block_range
+            window_start = max(0, block_start - 2 * window_size)
+            window_end = min(replace_position.size(1), block_end + window_size)
+            if x.size(1) != window_end - window_start:
+                raise ValueError("local prefill length does not match the cache window")
+            attention_replace_position = torch.zeros_like(replace_position)
+            attention_replace_position[:, window_start:window_end] = True
+            attention_cache_range = (window_start, window_end)
+            local_q_start = block_start - window_start
+            local_q_end = block_end - window_start
+        current_hidden_state = x if use_cache else None
+        cluster = cluster or (efficient and (layer_id > 28 or layer_id == 0))
+
+        # ------------------------------------------------------------------
+        # 1) State patching (decode path)
+        #    Apply updates from previous layer to:
+        #    - hidden-state cache
+        #    - KV cache
+        #    - cluster centroids
+        # ------------------------------------------------------------------
+        with gpu_timing_range(f"blk{layer_id}:state_patch", enabled=x.is_cuda):
+            if update_packet_prev is not None and hidden_state_past is not None and cluster and use_cluster:
+                hidden_state_past, clustered_hidden_state, layer_past = apply_state_patching(
+                    update_packet_prev=update_packet_prev,
+                    hidden_state_past=hidden_state_past,
+                    clustered_hidden_state=clustered_hidden_state,
+                    layer_past=layer_past,
+                    attn_norm=self.attn_norm,
+                    k_proj=self.k_proj,
+                    v_proj=self.v_proj,
+                    d_model=self.config.d_model,
+                    n_heads=self.config.n_heads,
+                    effective_n_kv_heads=self.config.effective_n_kv_heads,
+                    prefetched_h_old_raw=prefetched_h_old_raw,
+                    quant_offload_state=self._quant_offload_state if enable_quantization else None,
+                )
+
+        # ------------------------------------------------------------------
+        # 2) Cache-step initialization (step 0)
+        #    Build clustered windows around the active block for later updates.
+        # ------------------------------------------------------------------
+        step0_async_handle = None
+        step0_event = None
+        clustered_state_tmp = None
+        offload_state_tmp = None
+        with gpu_timing_range(f"blk{layer_id}:step0_init", enabled=x.is_cuda):
+            if (
+                use_cache
+                and use_cluster
+                and hidden_state_past is None
+                and clustered_hidden_state is None
+                and replace_position is not None
             ):
-            current_hidden_state = x if use_cache else None
-            self.attn_weights = None
-            block_mask = replace_position[0]
-            L_total = block_mask.size(0)
-            block_pos = block_mask.nonzero(as_tuple=True)[0]
-            curr_start = block_pos[0].item()
-            curr_end = block_pos[-1].item() + 1
+                self.attn_weights = None
+                if enable_overlap and x.is_cuda:
+                    if self._step0_stream is None:
+                        self._step0_stream = torch.cuda.Stream(device=x.device)
+                    with torch.cuda.stream(self._step0_stream):
+                        with gpu_timing_range(f"blk{layer_id}:step0_cluster_offload_async", enabled=True):
+                            if enable_quantization:
+                                clustered_state_tmp, offload_state_tmp = initialize_clustered_hidden_state_with_offload(
+                                    x=x,
+                                    current_hidden_state=current_hidden_state,
+                                    replace_position=replace_position,
+                                    window_size=window_size,
+                                    target_total=8,
+                                    quantization_precision=quantization_precision,
+                                    group_size=16,
+                                    block_range=block_range,
+                                )
+                            else:
+                                clustered_state_tmp = initialize_clustered_hidden_state(
+                                    x=x,
+                                    current_hidden_state=current_hidden_state,
+                                    replace_position=replace_position,
+                                    window_size=window_size,
+                                    target_total=8,
+                                    enable_quantization=False,
+                                    quantization_precision=quantization_precision,
+                                    block_range=block_range,
+                                )
+                                offload_state_tmp = None
+                    step0_event = torch.cuda.Event()
+                    step0_event.record(self._step0_stream)
+                    step0_async_handle = (step0_event, clustered_state_tmp, offload_state_tmp)
+                else:
+                    clustered_hidden_state = initialize_clustered_hidden_state(
+                        x=x,
+                        current_hidden_state=current_hidden_state,
+                        replace_position=replace_position,
+                        window_size=window_size,
+                        target_total=8,
+                        enable_quantization=enable_quantization,
+                        quantization_precision=quantization_precision,
+                        block_range=block_range,
+                    )
 
-            w_start = max(0, curr_start - 2 * window_size)
-            w_end = min(L_total, curr_end + window_size)
-            local_q_start = curr_start - w_start
-            local_q_end = curr_end - w_start
-
-            window_replace_postion[:, w_start:w_end] = 1
-
-            if current_hidden_state is not None and current_hidden_state.size(1) < L_total and efficient:
-
-                pre_window = current_hidden_state[:, :curr_start - w_start, :]
-                post_window = current_hidden_state[:, curr_end - w_start : w_end - w_start, :]
+        # ------------------------------------------------------------------
+        # 3) Main transformer forward (attention + MLP)
+        # ------------------------------------------------------------------
+        with gpu_timing_range(f"blk{layer_id}:main_attn", enabled=x.is_cuda):
+            if (
+                self._qkv_graph is not None
+                and layer_past is not None
+                and self._qkv_graph.accepts(x)
+            ):
+                q, k, v = self._qkv_graph(x)
             else:
-                pre_window = current_hidden_state[:, w_start:curr_start, :]
-                post_window = current_hidden_state[:, curr_end:w_end, :]
-            total_window_len = (curr_start - w_start) + (w_end - curr_end)
+                q, k, v = self._project_qkv(x)
+            attn_weights = None
+            rope_k = None
+            update_packet_L = None
+            attn_ready_event = torch.cuda.Event() if x.is_cuda and enable_overlap else None
 
-            target_total = 8
-            num_pre_clusters = max(1, target_total * (curr_start - w_start) // total_window_len)
-            num_pre_clusters = min(target_total - 1, num_pre_clusters)
-            if pre_window.size(1) == 0:
-                num_pre_clusters = 0
-            num_post_clusters = target_total - num_pre_clusters
-
-            all_centroids = []
-            full_labels = torch.full((x.size(0), L_total), -1, dtype=torch.long, device=x.device)
-
-            if pre_window.size(1) > 0:
-                pre_centroids, pre_labels = cluster_past_hidden_states(
-                    [pre_window.detach()], num_clusters=num_pre_clusters
-                )[0]
-                all_centroids.append(pre_centroids)
-                full_labels[:, w_start:curr_start] = pre_labels
+            if self._activation_checkpoint_fn is not None:
+                att, cache = self._activation_checkpoint_fn(  # type: ignore
+                    self.attention,
+                    q,
+                    k,
+                    v,
+                    attention_bias,
+                    layer_past=layer_past,
+                    use_cache=use_cache,
+                    replace_position=attention_replace_position,
+                    cache_range=attention_cache_range,
+                    proxy_ready_event=attn_ready_event,
+                )
             else:
-                all_centroids.append(torch.empty((x.size(0), 0, pre_window.size(-1)), device=x.device))
-
-            if post_window.size(1) > 0:
-                post_centroids, post_labels = cluster_past_hidden_states(
-                    [post_window.detach()], num_clusters=num_post_clusters
-                )[0]
-                all_centroids.append(post_centroids)
-                full_labels[:, curr_end:w_end] = post_labels + num_pre_clusters
+                att, cache, attn_weights, rope_k = self.attention(
+                    q,
+                    k,
+                    v,
+                    attention_bias,
+                    layer_past=layer_past,
+                    use_cache=use_cache,
+                    replace_position=attention_replace_position,
+                    cache_range=attention_cache_range,
+                    proxy_ready_event=attn_ready_event,
+                    output_attentions=(
+                        use_cache
+                        and get_token_drift_score
+                        and layer_id == self.config.n_layers - 1
+                    ),
+                )
+        # Queue the main FFN before proxy selection. Proxy selection reads a dynamic
+        # GPU index count on the host, so queuing it first would leave the main
+        # stream idle while the host waits for that count.
+        with gpu_timing_range(f"blk{layer_id}:main_ffn", enabled=x.is_cuda):
+            x = x + self.dropout(att)
+            if self._activation_checkpoint_fn is not None:
+                residual = x
+                x = self._activation_checkpoint_fn(self.ff_norm, x)  # type: ignore
+                x, x_up = self.ff_proj(x), self.up_proj(x)
+                x = self._activation_checkpoint_fn(self.act, x)  # type: ignore
+                x = residual + self.dropout(self.ff_out(x * x_up))
+            elif self._ffn_graph is not None and self._ffn_graph.accepts(x):
+                x = self._ffn_graph(x)
             else:
-                all_centroids.append(torch.empty((x.size(0), 0, post_window.size(-1)), device=x.device))
+                x = self._feed_forward(x)
 
-            centroids = torch.cat(all_centroids, dim=1)
-            centroids = centroids.to(x.dtype)
-            B_c, K, _ = centroids.shape
-            valid = (full_labels >= 0) & (full_labels < K)
-            labels_safe = full_labels.clamp(min=0)
-            counts = torch.zeros((B_c, K), device=x.device, dtype=torch.float32)
-            counts.scatter_add_(1, labels_safe, valid.to(counts.dtype))
-            counts = counts.unsqueeze(-1)
-            clustered_hidden_state = (centroids, full_labels, counts.to(x.dtype))
+        # Launch proxy-attention/update-packet path on a side stream so it can overlap with FFN.
+        proxy_async_handle = None
+        clustered_hidden_for_proxy = clustered_hidden_state
+        quant_offload_for_proxy = self._quant_offload_state if enable_quantization else None
+        if clustered_hidden_for_proxy is None and step0_async_handle is not None:
+            clustered_hidden_for_proxy = clustered_state_tmp
+            if enable_quantization:
+                quant_offload_for_proxy = offload_state_tmp
 
-        x_normed = self.attn_norm(x)
-        q = self.q_proj(x_normed)
-        k = self.k_proj(x_normed)
-        v = self.v_proj(x_normed)
-        attn_weight = None
-        if self._activation_checkpoint_fn is not None:
-            att, cache = self._activation_checkpoint_fn(  # type: ignore
-                self.attention,
-                q,
-                k,
-                v,
-                attention_bias,
-                layer_past=layer_past,
-                use_cache=use_cache,
-                replace_position=replace_position,
-            )
-        else:
-            att, cache, attn_weights, rope_k = self.attention(
-                q,
-                k,
-                v,
-                attention_bias,
-                layer_past=layer_past,
-                use_cache=use_cache,
-                replace_position=replace_position if not efficient else window_replace_postion,
-                output_attentions=use_cache,
-            )
-        drift_score=None
-        if replace_position is not None:
-            block_mask = replace_position[0]
-            L_total = block_mask.size(0)
-            block_pos = block_mask.nonzero(as_tuple=True)[0]
-            curr_start = block_pos[0].item()
-            curr_end = block_pos[-1].item() + 1
-
-            if attn_weights.size(-2) == L_total:
-                attn_weights = attn_weights[:,:,curr_start:curr_end,:]
-            elif efficient and local_q_start is not None and local_q_end is not None:
-                attn_weights = attn_weights[:, :, local_q_start:local_q_end, :]
-        def token_drift_kl(curr_attn, prev_attn, eps=1e-12):
-
-            curr = curr_attn.detach().to(torch.float32).clamp_min(eps)
-            prev = prev_attn.detach().to(torch.float32).clamp_min(eps)
-
-            kl_bhq = (curr * (torch.log(curr) - torch.log(prev))).sum(dim=-1)
-            kl_bhq = kl_bhq.clamp_min(0.0)
-
-            drift_bq = kl_bhq.mean(dim=1)
-            return drift_bq
-        if attn_weights is not None and get_token_drift_score and layer_id == self.config.n_layers - 1:
-            if getattr(self, "attn_weights", None) is not None:
-                drift_bq = token_drift_kl(attn_weights, self.attn_weights)
-                drift_score = drift_bq[0]
-        if layer_id == self.config.n_layers - 1:
-            self.attn_weights = attn_weights.detach() if attn_weights is not None else None
-        elif not get_token_drift_score:
-            self.attn_weights = None
-        x = x + self.dropout(att)
-        og_x = x
-        if self._activation_checkpoint_fn is not None:
-            x = self._activation_checkpoint_fn(self.ff_norm, x)  # type: ignore
-        else:
-            x = self.ff_norm(x)
-        x, x_up = self.ff_proj(x), self.up_proj(x)
-        if self._activation_checkpoint_fn is not None:
-            x = self._activation_checkpoint_fn(self.act, x)  # type: ignore
-        else:
-            x = self.act(x)
-        x = x * x_up
-        x = self.ff_out(x)
-        x = self.dropout(x)
-        x = og_x + x
-
-        update_packet_L = None
         if (
             use_cache
             and use_cluster
-            and clustered_hidden_state is not None
+            and clustered_hidden_for_proxy is not None
             and cache is not None
             and (cluster or hidden_state_past is None)
+            and rope_k is not None
+            and x.is_cuda
+            and enable_overlap
+        ):
+            if self._proxy_stream is None:
+                self._proxy_stream = torch.cuda.Stream(device=x.device)
+            with torch.cuda.stream(self._proxy_stream):
+                if attn_ready_event is not None:
+                    self._proxy_stream.wait_event(attn_ready_event)
+                if step0_event is not None:
+                    self._proxy_stream.wait_event(step0_event)
+                with gpu_timing_range(f"blk{layer_id}:proxy_update_async", enabled=True):
+                    prev_attn_scores = getattr(self, "_prev_attn_scores", None)
+                    update_packet_tmp, prev_scores_tmp = build_cluster_update_packet(
+                        clustered_hidden_state=clustered_hidden_for_proxy,
+                        cache=cache,
+                        hidden_state_past=hidden_state_past,
+                        replace_position=replace_position,
+                        topk=topk,
+                        rope_k=rope_k,
+                        attn_norm=self.attn_norm,
+                        q_proj=self.q_proj,
+                        ff_norm=self.ff_norm,
+                        ff_proj=self.ff_proj,
+                        up_proj=self.up_proj,
+                        act=self.act,
+                        ff_out=self.ff_out,
+                        attn_out=self.attn_out,
+                        dropout=self.dropout,
+                        rotary_emb=self.rotary_emb,
+                        scaled_dot_product_attention_fn=self._scaled_dot_product_attention,
+                        d_model=self.config.d_model,
+                        n_heads=self.config.n_heads,
+                        prev_attn_scores=prev_attn_scores,
+                        quant_offload_state=quant_offload_for_proxy,
+                        use_triton_dequant=True,
+                        centroid_q_graph=None,
+                    )
+            proxy_event = torch.cuda.Event()
+            proxy_event.record(self._proxy_stream)
+            proxy_async_handle = (proxy_event, update_packet_tmp, prev_scores_tmp)
+
+        block_mask = replace_position[0]
+        L_total = block_mask.size(0)
+        curr_start, curr_end = block_range
+
+        drift_score = None
+        if attn_weights is not None and attn_weights.size(-2) == L_total:
+            attn_weights = attn_weights[:, :, curr_start:curr_end, :]
+        elif attn_weights is not None and local_q_start is not None:
+            attn_weights = attn_weights[:, :, local_q_start:local_q_end, :]
+
+        if attn_weights is not None and get_token_drift_score and layer_id == self.config.n_layers - 1:
+            if getattr(self, "attn_weights", None) is not None:
+                prev_attn = self.attn_weights
+                # Decode-time cache growth can change attention tensor shapes across steps.
+                # Align to the overlapping tail window before KL to avoid shape-mismatch crashes.
+                q_common = min(attn_weights.size(-2), prev_attn.size(-2))
+                k_common = min(attn_weights.size(-1), prev_attn.size(-1))
+                if q_common > 0 and k_common > 0:
+                    curr_aligned = attn_weights[..., -q_common:, -k_common:]
+                    prev_aligned = prev_attn[..., -q_common:, -k_common:]
+                    drift_bq = compute_token_drift_kl(curr_aligned, prev_aligned)
+                    drift_score = drift_bq[0]
+
+        if layer_id == self.config.n_layers - 1 and attn_weights is not None:
+            self.attn_weights = attn_weights.detach()
+        elif not get_token_drift_score:
+            self.attn_weights = None
+
+        # ------------------------------------------------------------------
+        # 4) Cluster-based update packet construction
+        # ------------------------------------------------------------------
+        if proxy_async_handle is not None:
+            with gpu_timing_range(f"blk{layer_id}:proxy_sync", enabled=x.is_cuda):
+                proxy_event, update_packet_tmp, prev_scores_tmp = proxy_async_handle
+                torch.cuda.current_stream(x.device).wait_event(proxy_event)
+                update_packet_L = update_packet_tmp
+                self._prev_attn_scores = prev_scores_tmp
+            if step0_async_handle is not None:
+                clustered_hidden_state = clustered_state_tmp
+                self._quant_offload_state = offload_state_tmp
+        else:
+            if step0_async_handle is not None:
+                with gpu_timing_range(f"blk{layer_id}:step0_sync", enabled=x.is_cuda):
+                    torch.cuda.current_stream(x.device).wait_event(step0_event)
+                    clustered_hidden_state = clustered_state_tmp
+                    self._quant_offload_state = offload_state_tmp
+
+            if (
+                use_cache
+                and use_cluster
+                and clustered_hidden_state is not None
+                and cache is not None
+                and (cluster or hidden_state_past is None)
+                and rope_k is not None
             ):
-
-            head_dim = self.config.d_model // self.config.n_heads
-            n_h = self.config.n_heads
-            centroids, labels, _ = clustered_hidden_state
-            assert centroids.dim() == 3, "centroids should be (B, K, D)"
-            assert labels.dim() == 2, "labels should be (B, L_total)"
-
-            B_sz, K, D = centroids.shape
-            _, L_total = labels.shape
-
-            key, value = cache
-            Bk, n_kv_h, L_kv, hs = key.shape
-            assert L_kv == L_total, "Seq size mismatch in KV"
-
-            centers_norm = self.attn_norm(centroids)
-            cluster_q = self.q_proj(centers_norm)
-            cluster_q = cluster_q.view(B_sz, K, n_h, head_dim).transpose(1, 2)
-
-            if n_kv_h != n_h:
-                if n_h % n_kv_h != 0:
-                    raise ValueError(
-                        f"Cannot expand KV heads for proxy attention: n_h={n_h}, n_kv_h={n_kv_h}"
+                with gpu_timing_range(f"blk{layer_id}:proxy_update_sync", enabled=x.is_cuda):
+                    prev_attn_scores = getattr(self, "_prev_attn_scores", None)
+                    update_packet_L, self._prev_attn_scores = build_cluster_update_packet(
+                        clustered_hidden_state=clustered_hidden_state,
+                        cache=cache,
+                        hidden_state_past=hidden_state_past,
+                        replace_position=replace_position,
+                        topk=topk,
+                        rope_k=rope_k,
+                        attn_norm=self.attn_norm,
+                        q_proj=self.q_proj,
+                        ff_norm=self.ff_norm,
+                        ff_proj=self.ff_proj,
+                        up_proj=self.up_proj,
+                        act=self.act,
+                        ff_out=self.ff_out,
+                        attn_out=self.attn_out,
+                        dropout=self.dropout,
+                        rotary_emb=self.rotary_emb,
+                        scaled_dot_product_attention_fn=self._scaled_dot_product_attention,
+                        d_model=self.config.d_model,
+                        n_heads=self.config.n_heads,
+                        prev_attn_scores=prev_attn_scores,
+                        quant_offload_state=self._quant_offload_state if enable_quantization else None,
+                        use_triton_dequant=True,
+                        centroid_q_graph=self._centroid_q_graph,
                     )
-                repeat_factor = n_h // n_kv_h
-                key_for_proxy = key.repeat_interleave(repeat_factor, dim=1)
-            else:
-                key_for_proxy = key
 
-            attn_scores = torch.matmul(
-                cluster_q,
-                key_for_proxy.transpose(-2, -1),
-            ) / math.sqrt(head_dim)
-
-            attn_scores = F.softmax(attn_scores, dim=-1)
-
-            use_prev = (
-                hasattr(self, "_prev_attn_scores")
-                and (self._prev_attn_scores is not None)
-                and (hidden_state_past is not None)
-            )
-
-            scores0 = torch.zeros(K, device=centroids.device, dtype=torch.float32)
-
-            if use_prev:
-                prev_dist = self._prev_attn_scores.detach().to(torch.float32)
-                curr_dist = attn_scores.detach().to(torch.float32)
-
-                eps = 1e-12
-                kl_per_head = (
-                    curr_dist * (torch.log(curr_dist + eps) - torch.log(prev_dist + eps))
-                ).sum(dim=-1)
-
-                kl_per_head = torch.clamp(kl_per_head, min=0.0)
-
-                kl_drift = kl_per_head.mean(dim=1)
-                scores0 = kl_drift[0]
-
-            self._prev_attn_scores = attn_scores.detach()
-
-            if replace_position is not None and hidden_state_past is not None:
-
-                block_mask = replace_position[0]
-                non_block_mask = ~block_mask
-
-                K = centroids.shape[1]
-                M_req = topk if topk is not None else 0
-                M = min(M_req, K)
-                top_clusters = torch.topk(scores0, k=M, dim=-1).indices
-
-                labels_b0 = labels[0]
-                valid = labels_b0 >= 0
-                labels_safe = labels_b0.clamp(min=0)
-
-                K = centroids.shape[1]
-                top_mask = torch.zeros(K, device=labels_b0.device, dtype=torch.bool)
-                top_mask[top_clusters] = True
-
-                sel_mask = valid & top_mask[labels_safe] & non_block_mask
-                idx_global = sel_mask.nonzero(as_tuple=True)[0]
-                if idx_global.numel() > 0:
-
-                    hidden_cache = hidden_state_past[:, idx_global, :]
-                    h_cache_normed = self.attn_norm(hidden_cache)
-                    q_cache_sub = self.q_proj(h_cache_normed)
-                    q_cache_sub = q_cache_sub.view(B_sz, -1, n_h, head_dim).transpose(1, 2)
-                    q_sel = self.rotary_emb.apply_rotary_q_positions(
-                        q_cache_sub,
-                        positions=idx_global,
-                        key_len=L_total
-                    )
-                    h_sel = hidden_cache
-
-                    attn, _ = self._scaled_dot_product_attention(
-                        q_sel,
-                        rope_k,
-                        value,
-                        attn_mask=None,
-                        dropout_p=0.0,
-                        is_causal=False,
-                        output_attentions=False
-                    )
-                    att = attn.transpose(1, 2).contiguous().view(B_sz, -1, D)
-                    att = self.attn_out(att)
-                    h_sel = h_sel + self.dropout(att)
-                    og_h_sel = h_sel
-                    h_sel = self.ff_norm(h_sel)
-                    h_sel, h_sel_up = self.ff_proj(h_sel), self.up_proj(h_sel)
-                    h_sel = self.act(h_sel)
-                    h_sel = h_sel * h_sel_up
-                    h_sel = self.ff_out(h_sel)
-                    h_sel = self.dropout(h_sel)
-                    h_sel = og_h_sel + h_sel
-
-                    update_packet_L = (idx_global, h_sel)
-
+        # Output contract:
+        # - next layer receives `x` and `update_packet_L`
+        # - model output carries cache and hidden-state bookkeeping
         if use_cache:
             if not use_cluster:
                 hidden_state_past_new = None
@@ -1298,114 +1478,6 @@ class LLaDALlamaBlock(LLaDABlock):
 
         return x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet_L, drift_score
 
-class LLaDABlockDiffBlock(LLaDABlock):
-    """
-    This is a transformer block where the output is computed as ``MLP(LN(x + Attention(LN(x))))``
-    (plus another skip connection). This block is similar to `LLaDASequentialBlock`
-    but some operations have slightly different implementations to imitate the
-    behavior of Llama.
-    """
-
-    def __init__(self, layer_id: int, config: ModelConfig, cache: BufferCache):
-        super().__init__(layer_id, config, cache)
-
-        self.attn_norm = LayerNorm.build(config)
-        self.ff_norm = LayerNorm.build(config)
-        self.__cache = cache
-
-        head_dim = config.d_model // config.n_heads
-        q_proj_out_dim = config.d_model
-        k_proj_out_dim = config.effective_n_kv_heads * head_dim
-        v_proj_out_dim = config.effective_n_kv_heads * head_dim
-        self.q_proj = nn.Linear(
-            config.d_model, q_proj_out_dim, bias=config.include_bias | config.include_qkv_bias, device=config.init_device
-        )
-        self.k_proj = nn.Linear(
-            config.d_model, k_proj_out_dim, bias=config.include_bias | config.include_qkv_bias, device=config.init_device
-        )
-        self.v_proj = nn.Linear(
-            config.d_model, v_proj_out_dim, bias=config.include_bias | config.include_qkv_bias, device=config.init_device
-        )
-
-        self.ff_proj = nn.Linear(
-            config.d_model, self.hidden_size, bias=config.include_bias, device=config.init_device
-        )
-
-        self.up_proj = nn.Linear(
-            config.d_model, self.hidden_size, bias=config.include_bias, device=config.init_device
-        )
-
-    def reset_parameters(self):
-        super().reset_parameters()
-        self.attn_norm.reset_parameters()
-        self.ff_norm.reset_parameters()
-
-        init_weights(self.config, self.q_proj, d=self.config.d_model, layer_id=None)
-        init_weights(self.config, self.k_proj, d=self.config.d_model, layer_id=None)
-        init_weights(self.config, self.v_proj, d=self.config.d_model, layer_id=None)
-        init_weights(self.config, self.ff_proj, d=self.config.d_model, layer_id=None)
-        init_weights(self.config, self.up_proj, d=self.config.d_model, layer_id=None)
-
-    def cross_attn_flex(self, qkv, mask=None):
-        qkv = rearrange(qkv, 'b s three h d -> b h three s d', h=self.n_heads)
-        x = fused_flex_attention(
-        qkv[:, :, 0], qkv[:, :, 1], qkv[:, :, 2], mask=mask)
-        x = rearrange(x, 'b h s d -> b s (h d)')
-        return x
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        attention_bias: Optional[torch.Tensor] = None,
-        layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
-        use_cache: bool = False,
-        hidden_state_past: Optional[torch.Tensor] = None,
-        **kwargs,
-    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]], Optional[torch.Tensor], Optional[object]]:
-
-        x_normed = self.attn_norm(x)
-        q = self.q_proj(x_normed)
-        k = self.k_proj(x_normed)
-        v = self.v_proj(x_normed)
-
-        if self._activation_checkpoint_fn is not None:
-            att, cache = self._activation_checkpoint_fn(  # type: ignore
-                self.attention,
-                q,
-                k,
-                v,
-                attention_bias,
-                layer_past=layer_past,
-                use_cache=use_cache,
-            )
-        else:
-            att, cache = self.attention(
-                q,
-                k,
-                v,
-                attention_bias,
-                layer_past=layer_past,
-                use_cache=use_cache,
-            )
-
-        x = x + self.dropout(att)
-
-        og_x = x
-        if self._activation_checkpoint_fn is not None:
-            x = self._activation_checkpoint_fn(self.ff_norm, x)  # type: ignore
-        else:
-            x = self.ff_norm(x)
-        x, x_up = self.ff_proj(x), self.up_proj(x)
-        if self._activation_checkpoint_fn is not None:
-            x = self._activation_checkpoint_fn(self.act, x)  # type: ignore
-        else:
-            x = self.act(x)
-        x = x * x_up
-        x = self.ff_out(x)
-        x = self.dropout(x)
-        x = og_x + x
-
-        return x, cache
 
 class LLaDAOutput(NamedTuple):
     logits: torch.FloatTensor
@@ -1423,7 +1495,7 @@ class LLaDAOutput(NamedTuple):
     """
     Hidden states from each block.
     """
-    past_hidden_states: Optional[Tuple[torch.Tensor]]= None
+    past_hidden_states: Optional[Tuple[torch.Tensor]] = None
     """
     Past hidden states from each block.
     """
@@ -1431,10 +1503,11 @@ class LLaDAOutput(NamedTuple):
     """
     Clustered hidden states from each block.
     """
+    # token_importance_scores: Optional[Tuple[torch.Tensor]]= None
+    drift_scores: Optional[List[torch.FloatTensor]] = None
+    logits_sel: Optional[torch.FloatTensor] = None
+    sel_indices: Optional[torch.FloatTensor] = None
 
-    drift_scores: Optional[List[torch.FloatTensor]]= None
-    logits_sel: Optional[torch.FloatTensor]=None
-    sel_indices:Optional[torch.FloatTensor]=None
 
 class LLaDAGenerateOutput(NamedTuple):
     token_ids: torch.LongTensor
@@ -1447,6 +1520,7 @@ class LLaDAGenerateOutput(NamedTuple):
     """
     The scores of the generated sequences, a tensor of shape `(batch_size, beam_size)`.
     """
+
 
 class LLaDABlockGroup(nn.ModuleList):
     def __init__(self, config: ModelConfig, layer_offset: int, modules: Optional[Iterable[nn.Module]] = None):
@@ -1493,7 +1567,7 @@ class LLaDABlockGroup(nn.ModuleList):
                     and block_idx % 4 == 0
                 )
             ):
-
+                # shape: (batch_size, seq_len, d_model)
                 x, cache, current_hidden_state, update_packet = self._activation_checkpoint_fn(  # type: ignore
                     block,
                     x,
@@ -1505,7 +1579,7 @@ class LLaDABlockGroup(nn.ModuleList):
                     update_packet_prev=update_packet,
                 )
             else:
-
+                # shape: (batch_size, seq_len, d_model)
                 x, cache, current_hidden_state, update_packet = block(
                     x,
                     attention_bias=attention_bias,
@@ -1524,6 +1598,7 @@ class LLaDABlockGroup(nn.ModuleList):
 
         return x, attn_key_values, current_hidden_states, update_packet
 
+
     def reset_parameters(self):
         for block in self:
             block.reset_parameters()
@@ -1533,12 +1608,14 @@ class LLaDABlockGroup(nn.ModuleList):
         for block in self:
             block.set_activation_checkpointing(strategy)
 
+
 class LLaDAModel(nn.Module):
     def __init__(self, config: ModelConfig, init_params: bool = True):
         super().__init__()
         self.config = config
         self.__cache = BufferCache()
 
+        # Validate config.
         if self.config.alibi and self.config.flash_attention:
             raise Exception("ALiBi is currently not supported with FlashAttention")
 
@@ -1565,7 +1642,7 @@ class LLaDAModel(nn.Module):
             raise Exception("n layers must be divisible by block group size")
 
         torch.backends.cuda.enable_flash_sdp(True)
-        torch.backends.cuda.enable_mem_efficient_sdp(False)
+        torch.backends.cuda.enable_mem_efficient_sdp(False)  # this is super slow so make sure torch won't use it
 
         self.transformer = nn.ModuleDict(
             dict(
@@ -1602,14 +1679,17 @@ class LLaDAModel(nn.Module):
                     )
                 }
             )
-
+        # When `init_device="meta"` FSDP will call `reset_parameters()` to initialize weights.
         if init_params and self.config.init_device != "meta":
             self.reset_parameters()
         self.__num_fwd_flops: Optional[int] = None
-
+        self._prefetch_streams: Optional[List[torch.cuda.Stream]] = None
+        self._overlap_stream_pool_size: int = 3
+        # Warm up cache.
         if self.config.alibi:
             get_causal_attention_bias(self.__cache, config.max_sequence_length, _non_meta_init_device(config))
             self.get_alibi_attention_bias(config.max_sequence_length, _non_meta_init_device(config))
+
 
     def set_activation_checkpointing(self, strategy: Optional[ActivationCheckpointingStrategy]):
         self.activation_checkpointing_strategy = strategy
@@ -1630,7 +1710,7 @@ class LLaDAModel(nn.Module):
 
     def reset_parameters(self):
         log.info("Initializing model parameters...")
-
+        # Top-level embeddings / linear layers.
         init_weights(
             self.config,
             self.transformer.wte,  # type: ignore
@@ -1640,11 +1720,14 @@ class LLaDAModel(nn.Module):
         if hasattr(self.transformer, "wpe"):
             init_weights(self.config, self.transformer.wpe, type_of_module=ModuleType.emb)  # type: ignore
 
+        # Top-level layer norm.
         self.transformer.ln_f.reset_parameters()  # type: ignore
 
+        # Output weights.
         if hasattr(self.transformer, "ff_out"):
             init_weights(self.config, self.transformer.ff_out, type_of_module=ModuleType.final_out)  # type: ignore
 
+        # Let the blocks handle themselves.
         if self.config.block_group_size == 1:
             for block in self.transformer.blocks:
                 block.reset_parameters()
@@ -1684,6 +1767,10 @@ class LLaDAModel(nn.Module):
         efficient: Optional[bool] = False,
         get_token_drift_score: bool = False,
         use_cluster: bool = True,
+        enable_quantization: bool = False,
+        quantization_precision: str = "fp4",
+        enable_overlap: bool = False,
+        block_range: Optional[Tuple[int, int]] = None,
     ) -> LLaDAOutput:
         """
         :param input_ids: A tensor of shape `(batch_size, seq_len)`.
@@ -1715,48 +1802,54 @@ class LLaDAModel(nn.Module):
         :param last_logits_only: If `True`, only compute the logits for the last token of each sequence.
             This can speed up decoding when you only care about the next token.
         """
-
+        # Add Basic MDM Model config check
         assert not self.config.alibi, "Alibi length extrapolation is not supported for MDM."
         assert self.config.rope, "Rope must be used in Llama-Encoder for MDM."
+        # assert (past_key_values is None and not use_cache), "The kvcache is not suppotred for MDM."
 
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
-
+        batch_size, seq_len = input_ids.size() if input_embeddings is None else input_embeddings.size()[:2]
         if past_key_values:
             assert len(past_key_values) == self.config.n_layers
 
-        batch_size, seq_len = input_ids.size() if input_embeddings is None else input_embeddings.size()[:2]
         if past_key_values is None:
             past_length = 0
         else:
             past_length = past_key_values[0][0].size(-2)
 
+        # Get embeddings of input.
+        # shape: (batch_size, seq_len, d_model)
         x = self.transformer.wte(input_ids) if input_embeddings is None else input_embeddings  # type: ignore
 
         if self.config.input_emb_norm:
             x = x * (self.config.d_model**0.5)
 
         if not (self.config.alibi or self.config.rope):
-
+            # Get positional embeddings.
+            # shape: (1, seq_len)
             pos = torch.arange(past_length, past_length + seq_len, dtype=torch.long, device=x.device).unsqueeze(0)
-
+            # shape: (1, seq_len, d_model)
             pos_emb = self.transformer.wpe(pos)  # type: ignore
             x = pos_emb + x
 
+        # Add input + positional embeddings and apply dropout.
+        # shape: (batch_size, seq_len, d_model)
         x = self.transformer.emb_drop(x)  # type: ignore
 
+        # Transform the attention mask into what the blocks expect.
         if attention_mask is not None and 0.0 in attention_mask:
-
+            # shape: (batch_size, 1, 1, seq_len)
             attention_mask = attention_mask.to(dtype=torch.float).view(batch_size, -1)[:, None, None, :]
             attention_mask = (1.0 - attention_mask) * torch.finfo(attention_mask.dtype).min
         else:
             attention_mask = None
 
+        # Merge attention mask with attention bias.
         if (
             attention_bias is not None
             or attention_mask is not None
             or self.config.alibi
-
-            or past_key_values is not None
+            or (past_key_values is not None and not self.config.flash_attention)
         ):
             if attention_bias is None and self.config.alibi:
                 attention_bias = get_causal_attention_bias(
@@ -1768,6 +1861,7 @@ class LLaDAModel(nn.Module):
                 attention_bias = attention_bias.to(dtype=torch.float)
                 attention_bias.masked_fill_(attention_bias == 0.0, torch.finfo(attention_bias.dtype).min)
 
+            # Transform to the right shape and data type.
             mask_len = seq_len
             if attention_mask is not None:
                 mask_len = attention_mask.shape[-1]
@@ -1775,25 +1869,30 @@ class LLaDAModel(nn.Module):
                 mask_len = past_key_values[0][0].shape[-2] + seq_len
             attention_bias = attention_bias[:, :, :mask_len, :mask_len].to(dtype=torch.float)
 
+            # Add in the masking bias.
             if attention_mask is not None:
                 attention_bias = attention_bias + attention_mask
-
+                # Might get -infs after adding attention mask, since dtype.min + dtype.min = -inf.
+                # `F.scaled_dot_product_attention()` doesn't handle -inf like you'd expect, instead
+                # it can produce NaNs.
                 ensure_finite_(attention_bias, check_neg_inf=True, check_pos_inf=False)
 
         attn_key_values: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = [] if use_cache else None
         updated_past_hidden_states: Optional[List[torch.Tensor]] = [] if use_cache else None
-
+        # updated_token_importance_scores: Optional[List[torch.Tensor]] = [] if use_cache else None
         updated_drift_scores: Optional[List[torch.Tensor]] = [] if use_cache else None
         updated_clustered_hidden_states: Optional[List[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]] = (
             [] if (use_cache) else None
         )
         all_hidden_states = []
         update_packet = None
+        prefetched_h_old_by_layer: Dict[int, Tuple[torch.Tensor, torch.cuda.Event]] = {}
 
-        if self.config.block_group_size == 1:
+        # Apply blocks one-by-one.
+        if self.config.block_group_size == 1: # used
             for block_idx, block in enumerate(self.transformer.blocks):
                 if output_hidden_states:
-
+                    # add hidden states
                     all_hidden_states.append(x)
 
                 layer_past = None if past_key_values is None else past_key_values[block_idx]
@@ -1801,6 +1900,12 @@ class LLaDAModel(nn.Module):
                 layer_clustered_hidden_state = None
                 if clustered_hidden_states is not None:
                     layer_clustered_hidden_state = clustered_hidden_states[block_idx]
+                prefetched_h_old_raw = None
+                if block_idx in prefetched_h_old_by_layer:
+                    with gpu_timing_range(f"layer{block_idx}:prefetch_wait", enabled=x.is_cuda):
+                        prefetched_h_old_raw, prefetch_event = prefetched_h_old_by_layer.pop(block_idx)
+                        if x.is_cuda:
+                            torch.cuda.current_stream(x.device).wait_event(prefetch_event)
 
                 if (
                     (self.activation_checkpointing_strategy == ActivationCheckpointingStrategy.whole_layer)
@@ -1817,44 +1922,56 @@ class LLaDAModel(nn.Module):
                         and block_idx % 4 == 0
                     )
                 ):
-
-                    x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet = self._activation_checkpoint_fn(
-                        block,
-                        x,
-                        attention_bias=attention_bias,
-                        layer_past=layer_past,
-                        use_cache=use_cache,
-                        transfer_index=transfer_index,
-                        layer_id=block_idx,
-                        replace_position=replace_position,
-                        hidden_state_past=hidden_state_past,
-                        clustered_hidden_state=layer_clustered_hidden_state,
-                        update_packet_prev=update_packet,
-                        cluster=cluster,
-                        topk=topk,
-                        efficient=efficient,
-                        get_token_drift_score=get_token_drift_score,
-                        use_cluster=use_cluster,
-                    )
+                    # shape: (batch_size, seq_len, d_model)
+                    with gpu_timing_range(f"layer{block_idx}:block_forward_ckpt", enabled=x.is_cuda):
+                        x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet = self._activation_checkpoint_fn(
+                            block,
+                            x,
+                            attention_bias=attention_bias,
+                            layer_past=layer_past,
+                            use_cache=use_cache,
+                            transfer_index=transfer_index,
+                            layer_id=block_idx,
+                            replace_position=replace_position,
+                            hidden_state_past=hidden_state_past,
+                            clustered_hidden_state=layer_clustered_hidden_state,
+                            update_packet_prev=update_packet,
+                            cluster=cluster,
+                            topk=topk,
+                            efficient=efficient,
+                            get_token_drift_score=get_token_drift_score,
+                            use_cluster=use_cluster,
+                            enable_quantization=enable_quantization,
+                            quantization_precision=quantization_precision,
+                            enable_overlap=enable_overlap,
+                            prefetched_h_old_raw=prefetched_h_old_raw,
+                            block_range=block_range,
+                        )
                 else:
-
-                    x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet, drift_score = block(
-                        x,
-                        attention_bias=attention_bias,
-                        layer_past=layer_past,
-                        use_cache=use_cache,
-                        transfer_index=transfer_index,
-                        layer_id=block_idx,
-                        replace_position=replace_position,
-                        hidden_state_past=hidden_state_past,
-                        clustered_hidden_state=layer_clustered_hidden_state,
-                        update_packet_prev=update_packet,
-                        cluster=cluster,
-                        topk=topk,
-                        efficient=efficient,
-                        get_token_drift_score=get_token_drift_score,
-                        use_cluster=use_cluster,
-                    )
+                    # shape: (batch_size, seq_len, d_model)
+                    with gpu_timing_range(f"layer{block_idx}:block_forward", enabled=x.is_cuda):
+                        x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet, drift_score = block(
+                            x,
+                            attention_bias=attention_bias,
+                            layer_past=layer_past,
+                            use_cache=use_cache,
+                            transfer_index=transfer_index,
+                            layer_id=block_idx,
+                            replace_position=replace_position,
+                            hidden_state_past=hidden_state_past,
+                            clustered_hidden_state=layer_clustered_hidden_state,
+                            update_packet_prev=update_packet,
+                            cluster=cluster,
+                            topk=topk,
+                            efficient=efficient,
+                            get_token_drift_score=get_token_drift_score,
+                            use_cluster=use_cluster,
+                            enable_quantization=enable_quantization,
+                            quantization_precision=quantization_precision,
+                            enable_overlap=enable_overlap,
+                            prefetched_h_old_raw=prefetched_h_old_raw,
+                            block_range=block_range,
+                        )
                 if attn_key_values is not None:
                     assert cache is not None
                     attn_key_values.append(cache)
@@ -1864,17 +1981,42 @@ class LLaDAModel(nn.Module):
 
                 if updated_drift_scores is not None:
                     updated_drift_scores.append(drift_score)
+                # if updated_token_importance_scores is not None:
+                #     updated_token_importance_scores.append(token_importance_score)
 
                 if updated_clustered_hidden_states is not None:
                     updated_clustered_hidden_states.append(
                         clustered_hidden_state_new if clustered_hidden_state_new is not None else layer_clustered_hidden_state
                     )
 
+                # Prefetch next layer's h_old rows for state patching.
+                if (
+                    update_packet is not None
+                    and past_hidden_states is not None
+                    and (block_idx + 1) < len(past_hidden_states)
+                    and past_hidden_states[block_idx + 1] is not None
+                    and x.is_cuda
+                    and enable_overlap
+                ):
+                    idx_upd, _ = update_packet
+                    next_hidden = past_hidden_states[block_idx + 1]
+                    if self._prefetch_streams is None:
+                        self._prefetch_streams = [
+                            torch.cuda.Stream(device=x.device) for _ in range(self._overlap_stream_pool_size)
+                        ]
+                    prefetch_stream = self._prefetch_streams[block_idx % len(self._prefetch_streams)]
+                    with torch.cuda.stream(prefetch_stream):
+                        with gpu_timing_range(f"layer{block_idx}:next_hold_prefetch_async", enabled=True):
+                            h_old_next = next_hidden[:, idx_upd, :].contiguous()
+                    prefetch_event = torch.cuda.Event()
+                    prefetch_event.record(prefetch_stream)
+                    prefetched_h_old_by_layer[block_idx + 1] = (h_old_next, prefetch_event)
+
         else:
             update_packet = None
             for group_idx, block_group in enumerate(self.transformer.block_groups):
                 if output_hidden_states:
-
+                    # add hidden states
                     all_hidden_states.append(x)
 
                 layers_past = (
@@ -1895,6 +2037,7 @@ class LLaDAModel(nn.Module):
                     start = group_idx * self.config.block_group_size
                     end = (group_idx + 1) * self.config.block_group_size
                     group_clustered_hidden_states = clustered_hidden_states[start:end]
+
 
                 x, cache, current_hs, update_packet = block_group(
                     x,
@@ -1925,14 +2068,18 @@ class LLaDAModel(nn.Module):
             if self.config.scale_logits:
                 logits_sel.mul_(1 / math.sqrt(self.config.d_model))
         if last_logits_only:
-
+            # shape: (batch_size, 1, d_model)
             x = x[:, -1, :].unsqueeze(1)
 
+        # Apply final layer norm.
+        # shape: (batch_size, seq_len or 1, d_model)
         x = self.transformer.ln_f(x)  # type: ignore
         if output_hidden_states:
-
+            # add final hidden state post-final-layernorm, following HuggingFace's convention
             all_hidden_states.append(x)
 
+        # Get logits.
+        # shape: (batch_size, seq_len or 1, vocab_size)
         if self.config.weight_tying:
             logits = F.linear(x, self.transformer.wte.weight, None)  # type: ignore
         else:
@@ -1944,12 +2091,13 @@ class LLaDAModel(nn.Module):
             attn_key_values=attn_key_values,
             hidden_states=tuple(all_hidden_states) if output_hidden_states else None,
             past_hidden_states=updated_past_hidden_states,
-
+            # token_importance_scores = updated_token_importance_scores,
             clustered_hidden_states=updated_clustered_hidden_states if updated_clustered_hidden_states is not None else clustered_hidden_states,
             drift_scores = updated_drift_scores,
             logits_sel=logits_sel,
             sel_indices=sel_indices,
         )
+
 
 def create_model_config_from_pretrained_config(config: LLaDAConfig):
     """
@@ -1962,6 +2110,7 @@ def create_model_config_from_pretrained_config(config: LLaDAConfig):
 
     model_config = ModelConfig(**kwargs)
     return model_config
+
 
 class LLaDAModelLM(PreTrainedModel):
     """
@@ -1977,11 +2126,18 @@ class LLaDAModelLM(PreTrainedModel):
 
         if not model:
             model_config = create_model_config_from_pretrained_config(config)
-
+            # Initialize model (always on CPU to start with so we don't run out of GPU memory).
             model_config.init_device = "cpu"
             self.model = LLaDAModel(model_config, init_params=init_params)
         else:
             self.model = model
+
+    @torch.inference_mode()
+    def prepare_decode_graphs(self, block_length: int) -> None:
+        """Capture fixed-shape FFNs once after loading weights onto CUDA."""
+        for block in self.model.transformer.blocks:
+            if isinstance(block, LLaDALlamaBlock):
+                block.prepare_decode_graph(block_length)
 
     def forward(
         self,
@@ -1998,12 +2154,16 @@ class LLaDAModelLM(PreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        replace_position: Optional[torch.Tensor] = None,
+        replace_position: Optional[torch.Tensor] = None,  # This is a hack mitigation of an issue in transformers `4.39.x`
         cluster: Optional[bool] = None,
         topk: Optional[int] = None,
         efficient: Optional[bool] = False,
         get_token_drift_score: Optional[bool] = None,
         use_cluster: Optional[bool] = True,
+        enable_quantization: Optional[bool] = False,
+        quantization_precision: Optional[str] = "fp4",
+        enable_overlap: Optional[bool] = False,
+        block_range: Optional[Tuple[int, int]] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         if use_cache is None:
             use_cache = self.config.use_cache
@@ -2012,7 +2172,8 @@ class LLaDAModelLM(PreTrainedModel):
             raise ValueError("output_attentions is not yet supported in LLaDA")
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+        # import pdb; pdb.set_trace()
+        # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model.forward(
             input_ids=input_ids,
             input_embeddings=inputs_embeds,
@@ -2030,8 +2191,12 @@ class LLaDAModelLM(PreTrainedModel):
             efficient=efficient,
             get_token_drift_score=get_token_drift_score,
             use_cluster=use_cluster,
+            enable_quantization=enable_quantization,
+            quantization_precision=quantization_precision,
+            enable_overlap=enable_overlap,
+            block_range=block_range,
         )
-
+        # import pdb; pdb.set_trace()
         logits = outputs.logits
         hidden_states = outputs.hidden_states
 
@@ -2048,7 +2213,7 @@ class LLaDAModelLM(PreTrainedModel):
             past_key_values=outputs.attn_key_values,
             hidden_states=hidden_states,
             past_hidden_states=outputs.past_hidden_states,
-
+            # token_importance_scores=outputs.token_importance_scores,
             clustered_hidden_states=outputs.clustered_hidden_states,
             drift_scores=outputs.drift_scores,
             logits_sel=outputs.logits_sel,
@@ -2062,13 +2227,14 @@ class LLaDAModelLM(PreTrainedModel):
         self, input_ids: torch.LongTensor, past_key_values: Optional[List[Tuple]] = None, **kwargs
     ):
         if past_key_values:
-
+            # This is because we want the model to only process the last generated token.
             input_ids = input_ids[:, -1:]
         model_inputs = {"input_ids": input_ids, "past_key_values": past_key_values}
 
         model_inputs.update(kwargs)
         model_inputs["use_cache"] = kwargs.pop("use_cache", self.config.use_cache)
         return model_inputs
+
 
     def get_input_embeddings(self) -> torch.nn.Module:
         return self.model.transformer.wte
@@ -2092,4 +2258,5 @@ class LLaDAModelLM(PreTrainedModel):
         if self.config.weight_tying:
             self.model.transformer.ff_out = self.model.transformer.wte
 
+# Register the model so that it is available for transformer pipelines, auto-loading, etc.
 AutoModel.register(LLaDAConfig, LLaDAModelLM)

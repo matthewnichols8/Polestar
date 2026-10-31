@@ -46,7 +46,16 @@ def set_seed(seed):
 @register_model('polestar_llada')
 class LLaDAEvalHarness(LM):
 
-    def __init__(self, model_path='', mask_id=126336, max_length=4096, batch_size=1, mc_num=128, is_check_greedy=True, steps=256, gen_length=256, block_length=32, remasking='low_confidence', device='cuda', use_cache=True, threshold_early=0.7, threshold=0.9, factor=None, save_dir=None, show_speed=True, dual_cache=True, use_cluster=True, cfg: float=0.0, **kwargs):
+    def __init__(
+        self, model_path='', mask_id=126336, max_length=4096, batch_size=1,
+        mc_num=128, is_check_greedy=True, steps=256, gen_length=256,
+        block_length=32, remasking='low_confidence', device='cuda',
+        use_cache=True, threshold_early=0.7, threshold=0.9, factor=None,
+        save_dir=None, show_speed=True, dual_cache=True, use_cluster=True,
+        cfg: float=0.0, enable_quantization=False,
+        quantization_precision="fp4", enable_overlap=False,
+        enable_cuda_graphs=False, model_factory=None, generate_fn=None, **kwargs,
+    ):
         super().__init__()
         set_seed(42)
         accelerator = accelerate.Accelerator()
@@ -54,21 +63,33 @@ class LLaDAEvalHarness(LM):
             self.accelerator = accelerator
         else:
             self.accelerator = None
-        model_kwargs = {}
-        if self.accelerator is not None:
-            model_kwargs.update({'device_map': {'': f'{self.accelerator.device}'}})
-        config = AutoConfig.from_pretrained(model_path)
-        config.flash_attention = True
-        self.model = LLaDAModelLM.from_pretrained(model_path, trust_remote_code=True, torch_dtype=torch.bfloat16, config=config, **model_kwargs)
-        self.model.eval()
         self.device = torch.device(device)
-        if self.accelerator is not None:
-            self.model = self.accelerator.prepare(self.model)
-            self.device = torch.device(f'{self.accelerator.device}')
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
+        if model_factory is not None:
+            if self.accelerator is not None:
+                raise ValueError("external LLaDA model factories require a single worker")
+            self.model = model_factory(model_path, self.device)
         else:
-            self.model = self.model.to(device)
+            model_kwargs = {}
+            if self.accelerator is not None:
+                model_kwargs.update({'device_map': {'': f'{self.accelerator.device}'}})
+            config = AutoConfig.from_pretrained(model_path)
+            config.flash_attention = True
+            self.model = LLaDAModelLM.from_pretrained(
+                model_path, torch_dtype=torch.bfloat16,
+                config=config, **model_kwargs,
+            )
+            self.model.eval()
+            if self.accelerator is not None:
+                self.model = self.accelerator.prepare(self.model)
+                self.device = torch.device(f'{self.accelerator.device}')
+                self._rank = self.accelerator.local_process_index
+                self._world_size = self.accelerator.num_processes
+            else:
+                self.model = self.model.to(device)
+        if enable_cuda_graphs:
+            if self.accelerator is not None:
+                raise ValueError("CUDA graph capture requires a single GPU worker")
+            self.model.prepare_decode_graphs(block_length)
         self.mask_id = mask_id
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         self.mc_num = mc_num
@@ -93,6 +114,10 @@ class LLaDAEvalHarness(LM):
         self.dual_cache = dual_cache
         self.use_cluster = use_cluster
         self.cfg = float(cfg)
+        self.enable_quantization = enable_quantization
+        self.quantization_precision = quantization_precision
+        self.enable_overlap = enable_overlap
+        self._generate_with_dual_cache = generate_fn or generate_with_dual_cache
 
     @property
     def rank(self):
@@ -231,6 +256,8 @@ class LLaDAEvalHarness(LM):
                 batched_requests.append([])
         if len(batched_requests[-1]) == 0:
             batched_requests.pop()
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
         start_time = time.time()
         for batch in tqdm(batched_requests, desc='Generating...'):
             batched_input_ids = []
@@ -261,7 +288,7 @@ class LLaDAEvalHarness(LM):
             input_ids = batched_input_ids
             if self.use_cache:
                 if self.dual_cache:
-                    generated_answer, nfe, block_stats, seq_len = generate_with_dual_cache(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor, threshold_early=self.threshold_early, use_cluster=self.use_cluster)
+                    generated_answer, nfe, block_stats, seq_len = self._generate_with_dual_cache(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor, threshold_early=self.threshold_early, use_cluster=self.use_cluster, enable_quantization=self.enable_quantization, quantization_precision=self.quantization_precision, enable_overlap=self.enable_overlap)
                     all_block_stats.extend(block_stats)
                     all_seq_lens.append(seq_len)
                 else:
@@ -270,11 +297,12 @@ class LLaDAEvalHarness(LM):
                 generated_answer, nfe, block_stats, seq_len = generate(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
                 all_block_stats.extend(block_stats)
                 all_seq_lens.append(seq_len)
+            if self.show_speed:
+                response_ids = generated_answer[:, input_ids.shape[1]:]
+                num_tokens += int((response_ids != 126081).sum().item())
+                num_nfe += nfe
             if self.is_instruct and 'task_id' in req.doc and str(req.doc['task_id']).lower().startswith('humaneval'):
                 generated_answer_ids = generated_answer[:, input_ids.shape[1]:]
-                if self.show_speed:
-                    num_tokens += (generated_answer_ids != 126081).sum()
-                    num_nfe += nfe
                 batched_generated_answer = [self.tokenizer.decode(generated_answer_ids[i], skip_special_tokens=True) for i in range(len(generated_answer_ids))]
             else:
                 batched_generated_answer = []
@@ -284,9 +312,6 @@ class LLaDAEvalHarness(LM):
                         if stop_seq in generated_answer_i:
                             generated_answer_i = generated_answer_i.split(stop_seq)[0]
                     generated_answer_ids = torch.tensor(self.tokenizer(generated_answer_i)['input_ids'])
-                    if self.show_speed:
-                        num_tokens += (generated_answer_ids != 126081).sum()
-                        num_nfe += nfe
                     generated_answer_i = self.tokenizer.decode(generated_answer_ids, skip_special_tokens=True)
                     batched_generated_answer.append(generated_answer_i)
             output.extend(batched_generated_answer)
@@ -294,6 +319,8 @@ class LLaDAEvalHarness(LM):
                 with open(save_path, 'a', encoding='utf-8') as f:
                     for generated_answer in batched_generated_answer:
                         f.write(json.dumps(generated_answer, ensure_ascii=False) + '\n')
+        if self.device.type == "cuda":
+            torch.cuda.synchronize(self.device)
         end_time = time.time()
         print(f'Total number of tokens generated: {num_tokens}')
         print(f'Total time taken: {end_time - start_time} seconds')

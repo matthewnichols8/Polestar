@@ -75,6 +75,8 @@ def load_model(config: PolestarConfig, device: str = "cuda") -> tuple[Any, Any]:
         raise ValueError(f"Unsupported model_type: {config.model_type}")
 
     model = model_class.from_pretrained(config.model_id, **model_kwargs).to(device).eval()
+    if config.model_type == "llada" and config.generation.get("enable_cuda_graphs", False):
+        model.prepare_decode_graphs(config.generation["block_length"])
     tokenizer = AutoTokenizer.from_pretrained(config.model_id, trust_remote_code=True)
     return model, tokenizer
 
@@ -126,6 +128,9 @@ def generate(
                 threshold=threshold,
                 threshold_early=threshold_early,
                 use_cluster=True,
+                enable_quantization=settings.get("enable_quantization", False),
+                quantization_precision=settings.get("quantization_precision", "fp4"),
+                enable_overlap=settings.get("enable_overlap", False),
             )
             token_ids = sequences[:, input_ids.shape[1]:]
         elif config.model_type == "dream":

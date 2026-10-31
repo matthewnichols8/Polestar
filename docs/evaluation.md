@@ -16,6 +16,8 @@ python evaluation/run.py --config configs/llada8b.json --task gsm8k --output-pat
 
 Replace the model preset with `configs/llada15.json` or `configs/dream7b.json` to evaluate the other text models. Use `--max-new-tokens 512` for the longer generation setting. Presets and the task protocol are in `configs/evaluation/text.json`.
 
+For LLaDA, use `configs/llada8b-stream-overlap.json` to enable CUDA stream overlap, or `configs/llada8b-nvfp4.json` to simulate centroid-residual NVFP4 quantization in the GPU cache. `configs/llada8b-nvfp4-overlap.json` enables both and offloads selected hidden-state residuals to pinned CPU memory, storing two E2M1 values per byte with a group-of-16 FP8 E4M3 scale. These options leave the model checkpoint, decoding policy, and GSM8K few-shot settings unchanged. See [LLaDA system paths](system.md).
+
 For a smoke run, add `--limit 8` and use a separate output path. A fraction such as `--limit 0.1` evaluates 10% of each selected task. Omitting `--limit` evaluates the complete task.
 
 Add `--predict-only` to save generated responses without computing task scores. For example:
@@ -70,4 +72,4 @@ Prediction mode and the standalone generation examples do not use the scoring AP
 
 ## Results and measurements
 
-The [paper](https://arxiv.org/pdf/2607.14107) contains accuracy, tokens-per-forward (TPF), and tokens-per-second (TPS) across model/task settings. Record model/checkpoint, preset, seed, task/harness version, few-shot count, generation length, batch size, hardware, and scoring method with each run. Generation accounting excludes prompt tokens; code-task scores use their task's postprocessing and tests. Keep generation timing distinct from model download, task loading, and external answer scoring.
+The [paper](https://arxiv.org/pdf/2607.14107) contains accuracy, tokens-per-forward (TPF), and tokens-per-second (TPS) across model/task settings. The runner finishes the full fixed-length denoising trajectory even when an EOS token appears. TPF and TPS count all non-EOS response positions before answer stop-sequence filtering, matching the paper's measurement definition. TPS divides that count by wall-clock decoding time and includes tokenization. Record model/checkpoint, preset, seed, task/harness version, few-shot count, generation length, batch size, hardware, and scoring method with each run. Code-task scores use their task's postprocessing and tests. Keep generation timing distinct from model download, task loading, and external answer scoring.

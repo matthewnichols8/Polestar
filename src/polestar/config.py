@@ -30,6 +30,17 @@ class PolestarConfig:
             raise ValueError("max_new_tokens must be divisible by block_length")
         if steps % (length // block):
             raise ValueError("steps must be divisible by the number of generation blocks")
+        for option in ("enable_quantization", "enable_overlap", "enable_cuda_graphs"):
+            if option in self.generation and not isinstance(self.generation[option], bool):
+                raise ValueError(f"{option} must be a boolean")
+        precision = self.generation.get("quantization_precision", "fp4")
+        if precision not in {"fp4", "int2"}:
+            raise ValueError("quantization_precision must be fp4 or int2")
+        if self.model_type != "llada" and any(
+            option in self.generation
+            for option in ("enable_quantization", "quantization_precision", "enable_overlap", "enable_cuda_graphs")
+        ):
+            raise ValueError("system cache options currently require model_type llada")
 
     @classmethod
     def from_json(cls, path: str | Path) -> "PolestarConfig":

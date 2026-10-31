@@ -5,7 +5,16 @@ import pytest
 from polestar import PolestarConfig
 
 
-@pytest.mark.parametrize("filename", ["llada8b.json", "llada15.json", "dream7b.json", "llada-v.json"])
+@pytest.mark.parametrize("filename", [
+    "llada8b.json",
+    "llada8b-cuda-graphs.json",
+    "llada8b-stream-overlap.json",
+    "llada8b-nvfp4.json",
+    "llada8b-nvfp4-overlap.json",
+    "llada15.json",
+    "dream7b.json",
+    "llada-v.json",
+])
 def test_model_presets(filename):
     config = PolestarConfig.from_json("configs/" + filename)
     assert config.generation["block_length"] == 32

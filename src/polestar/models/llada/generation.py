@@ -45,14 +45,10 @@ def get_num_transfer_tokens(mask_index, steps):
     base = mask_num // steps
     remainder = mask_num % steps
 
-    num_transfer_tokens = torch.zeros(mask_num.size(0), steps, device=mask_index.device, dtype=torch.int64) + base
+    step_ids = torch.arange(steps, device=mask_index.device).unsqueeze(0)
+    return base + (step_ids < remainder).to(torch.int64)
 
-    for i in range(mask_num.size(0)):
-        num_transfer_tokens[i, :remainder[i]] += 1
-
-    return num_transfer_tokens
-
-@ torch.no_grad()
+@torch.inference_mode()
 def generate(model, prompt, steps=128, gen_length=128, block_length=128, temperature=0.,
              remasking='low_confidence', mask_id=126336, threshold=None, factor=None):
     '''
@@ -114,7 +110,7 @@ def generate(model, prompt, steps=128, gen_length=128, block_length=128, tempera
             })
     return x, nfe, block_stats, seq_len
 
-@ torch.no_grad()
+@torch.inference_mode()
 def generate_with_prefix_cache(model, prompt, steps=128, gen_length=128, block_length=128, temperature=0.,
              remasking='low_confidence', mask_id=126336, threshold=None, factor=None):
     '''
@@ -191,9 +187,11 @@ def generate_with_prefix_cache(model, prompt, steps=128, gen_length=128, block_l
 
     return x, nfe
 
-@ torch.no_grad()
+@torch.inference_mode()
 def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_length=128, temperature=0.,
-            remasking='low_confidence', mask_id=126336, threshold=None, factor=None, threshold_early=None, use_cluster=True):
+            remasking='low_confidence', mask_id=126336, threshold=None, factor=None, threshold_early=None, use_cluster=True,
+            enable_quantization=False, quantization_precision="fp4", enable_overlap=False,
+            eos_id=None, early_stop=False):
     '''
     Args:
         model: Mask predictor.
@@ -219,7 +217,6 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
     efficient = False
     block_stats = []
     seq_len = prompt.shape[1]
-
     if not use_cluster:
         for num_block in range(num_blocks):
             block_nfe = 0
@@ -341,11 +338,15 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
                 x_window,
                 use_cache=True,
                 replace_position=replace_position,
+                block_range=(current_block_start, current_block_end),
                 past_key_values=past_key_values,
                 cluster=False,
                 get_token_drift_score=True,
                 efficient=True,
                 use_cluster=True,
+                enable_quantization=enable_quantization,
+                quantization_precision=quantization_precision,
+                enable_overlap=enable_overlap,
             )
 
             past_key_values = output.past_key_values
@@ -359,7 +360,8 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
                     past_hidden_states = output.past_hidden_states
                 else:
                     for layer_idx, layer_hidden in enumerate(output.past_hidden_states):
-                        past_hidden_states[layer_idx][:, block_prefix_window:block_suffix_window, :] = layer_hidden
+                        if layer_hidden is not None:
+                            past_hidden_states[layer_idx][:, block_prefix_window:block_suffix_window, :] = layer_hidden
 
             clustered_hidden_states = output.clustered_hidden_states
         else:
@@ -367,9 +369,13 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
                 x,
                 use_cache=True,
                 replace_position=replace_position,
+                block_range=(current_block_start, current_block_end),
                 cluster=False,
                 get_token_drift_score=True,
                 use_cluster=True,
+                enable_quantization=enable_quantization,
+                quantization_precision=quantization_precision,
+                enable_overlap=enable_overlap,
             )
             past_key_values = output.past_key_values
             past_hidden_states = output.past_hidden_states
@@ -417,17 +423,16 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
         w = 5
         drift_window = []
 
-        while True:
-            num_of_mask = (x[:, current_block_start:current_block_end] == mask_id).sum().item()
-            if num_of_mask == 0:
-                break
-
+        initial_mask_count = mask_index_block.sum().item()
+        num_of_mask = (x[:, current_block_start:current_block_end] == mask_id).sum().item()
+        transferred = initial_mask_count - num_of_mask
+        while num_of_mask:
             nfe += 1
             block_nfe += 1
-            dec_tok_number_until_update += transfer_index.sum().item()
+            dec_tok_number_until_update += transferred
             mask_index = (x[:, current_block_start:current_block_end] == mask_id)
 
-            cluster = transfer_index.sum().item() > 1 or dec_tok_number_until_update > 2
+            cluster = transferred > 1 or dec_tok_number_until_update > 2
 
             topk=4
 
@@ -438,7 +443,10 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
                 block_efficient_true += 1
             output_decode = model(x[:, current_block_start:current_block_end], past_key_values=past_key_values,
                                   past_hidden_states=past_hidden_states, clustered_hidden_states=clustered_hidden_states, transfer_index=None, cluster=cluster, topk=topk,efficient=efficient,
-                                  use_cache=True, replace_position=replace_position, get_token_drift_score=True, use_cluster=True)
+                                  use_cache=True, replace_position=replace_position, get_token_drift_score=True, use_cluster=True,
+                                  block_range=(current_block_start, current_block_end),
+                                  enable_quantization=enable_quantization, quantization_precision=quantization_precision,
+                                  enable_overlap=enable_overlap)
             logits = output_decode.logits
             clustered_hidden_states = output_decode.clustered_hidden_states if cluster else clustered_hidden_states
             past_hidden_states = output_decode.past_hidden_states if cluster else past_hidden_states
@@ -496,7 +504,9 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
                 transfer_index |= early_commit_block
 
             x[:, current_block_start:current_block_end][transfer_index] = x0[transfer_index]
-            num_of_mask = (x[:, current_block_start:current_block_end] == mask_id).sum().item()
+            remaining = (x[:, current_block_start:current_block_end] == mask_id).sum().item()
+            transferred = num_of_mask - remaining
+            num_of_mask = remaining
             if logits_sel is not None and sel_indices is not None and cluster:
                 suffix_mask = (sel_indices >= current_block_end)
 
@@ -529,13 +539,17 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
             "cluster_true": int(block_cluster_true),
             "efficient_true": int(block_efficient_true),
         })
+        if early_stop and eos_id is not None:
+            block_tokens = x[:, current_block_start:current_block_end]
+            if torch.all(torch.any(block_tokens == eos_id, dim=1)).item():
+                x[:, current_block_end:] = eos_id
+                break
     return x, nfe, block_stats, seq_len
 
 
 def get_pre_transfer_index(logits, temperature, remasking, mask_index, x, num_transfer_tokens, threshold=None):
     logits_with_noise = add_gumbel_noise(logits, temperature=temperature)
     x0 = torch.argmax(logits_with_noise, dim=-1)
-
     if remasking == 'low_confidence':
         p = F.softmax(logits.to(torch.float32), dim=-1)
         x0_p = torch.squeeze(
@@ -548,22 +562,18 @@ def get_pre_transfer_index(logits, temperature, remasking, mask_index, x, num_tr
     x0 = torch.where(mask_index, x0, x)
     confidence = torch.where(mask_index, x0_p, -np.inf)
 
-    transfer_index = torch.zeros_like(x0, dtype=torch.bool, device=x0.device)
     if threshold is not None:
-        num_transfer_tokens = mask_index.sum(dim=1, keepdim=True)
-    for j in range(confidence.shape[0]):
-        _, select_index = torch.topk(confidence[j], k=num_transfer_tokens[j])
-        transfer_index[j, select_index] = True
-        if threshold is not None:
-            for k in range(0, num_transfer_tokens[j]):
-                if confidence[j, select_index[k]] < threshold:
-                    transfer_index[j, select_index[k]] = False
+        transfer_index = mask_index & (confidence >= threshold)
+    else:
+        transfer_index = torch.zeros_like(mask_index)
+        for j in range(confidence.shape[0]):
+            _, select_index = torch.topk(confidence[j], k=num_transfer_tokens[j])
+            transfer_index[j, select_index] = True
     return x0, transfer_index
 
 def get_transfer_index(logits, temperature, remasking, mask_index, x, num_transfer_tokens, threshold=None):
     logits_with_noise = add_gumbel_noise(logits, temperature=temperature)
     x0 = torch.argmax(logits_with_noise, dim=-1)
-
     if remasking == 'low_confidence':
         p = F.softmax(logits.to(torch.float32), dim=-1)
         x0_p = torch.squeeze(
@@ -576,16 +586,17 @@ def get_transfer_index(logits, temperature, remasking, mask_index, x, num_transf
     x0 = torch.where(mask_index, x0, x)
     confidence = torch.where(mask_index, x0_p, -np.inf)
 
-    transfer_index = torch.zeros_like(x0, dtype=torch.bool, device=x0.device)
     if threshold is not None:
-        num_transfer_tokens = mask_index.sum(dim=1, keepdim=True)
-    for j in range(confidence.shape[0]):
-        _, select_index = torch.topk(confidence[j], k=num_transfer_tokens[j])
-        transfer_index[j, select_index] = True
-        if threshold is not None:
-            for k in range(1, num_transfer_tokens[j]):
-                if confidence[j, select_index[k]] < threshold:
-                    transfer_index[j, select_index[k]] = False
+        transfer_index = mask_index & (confidence >= threshold)
+        # The first confidence-ranked masked position always advances, even
+        # when its confidence is below the static threshold.
+        best = confidence.argmax(dim=1, keepdim=True)
+        transfer_index.scatter_(1, best, mask_index.gather(1, best))
+    else:
+        transfer_index = torch.zeros_like(mask_index)
+        for j in range(confidence.shape[0]):
+            _, select_index = torch.topk(confidence[j], k=num_transfer_tokens[j])
+            transfer_index[j, select_index] = True
     return x0, transfer_index, confidence
 
 def get_transfer_index_dynamic(logits, temperature, remasking, mask_index, x, num_transfer_tokens, factor=1):

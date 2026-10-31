@@ -23,6 +23,8 @@ def k_means(x, num_clusters, num_iters=5, distance="cosine"):
 
     rand_idx = torch.randperm(L, device=device)[:num_clusters]
     centroids = x[:, :, rand_idx, :].clone()
+    fallback_idx = torch.arange(num_clusters, device=device) * (L // num_clusters)
+    fallback_points = x[:, :, fallback_idx, :]
 
     for _ in range(num_iters):
         if distance == "cosine":
@@ -44,11 +46,12 @@ def k_means(x, num_clusters, num_iters=5, distance="cosine"):
         cluster_counts = mask.sum(dim=2).unsqueeze(-1)
         new_centroids = sum_features / (cluster_counts + 1e-6)
 
-        is_empty = (cluster_counts == 0)
-        if is_empty.any():
-            random_indices = torch.randint(0, L, (num_clusters,), device=device)
-            random_points = x[:, :, random_indices, :]
-            new_centroids = torch.where(is_empty, random_points, new_centroids)
+        # Keep empty-cluster recovery on the device. Testing is_empty in
+        # Python synchronizes the GPU at every k-means iteration. A fixed,
+        # spaced fallback leaves the random stream unchanged when all clusters
+        # have members and gives empty clusters distinct input points.
+        is_empty = cluster_counts == 0
+        new_centroids = torch.where(is_empty, fallback_points, new_centroids)
 
         centroids = new_centroids
 

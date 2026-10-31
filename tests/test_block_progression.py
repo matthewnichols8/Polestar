@@ -48,3 +48,40 @@ def test_completed_middle_block_does_not_skip_remaining_blocks(suffix_token):
     assert model.calls == nfe == 3
     assert [row["block_id"] for row in stats] == [0, 2]
     assert sum(row["block_nfe"] for row in stats) == nfe
+
+
+def test_eos_stops_after_committed_block_and_pads_suffix():
+    class EosPredictor:
+        device = torch.device("cpu")
+        calls = 0
+
+        def __call__(self, tokens, **kwargs):
+            self.calls += 1
+            logits = torch.zeros(tokens.shape[0], tokens.shape[1], 3)
+            logits[..., 2] = 20
+            return SimpleNamespace(
+                logits=logits,
+                past_key_values=(),
+                past_hidden_states=[],
+                clustered_hidden_states=[],
+                drift_scores=[None],
+                logits_sel=None,
+                sel_indices=None,
+            )
+
+    model = EosPredictor()
+    tokens, nfe, stats, _ = generate_with_dual_cache(
+        model,
+        torch.tensor([[0]]),
+        steps=3,
+        gen_length=9,
+        block_length=3,
+        mask_id=9,
+        eos_id=2,
+        early_stop=True,
+        threshold=0.9,
+        threshold_early=0.7,
+    )
+    assert tokens.tolist() == [[0] + [2] * 9]
+    assert model.calls == nfe == 1
+    assert [row["block_id"] for row in stats] == [0]

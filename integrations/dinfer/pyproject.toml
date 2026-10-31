@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polestar-dinfer"
+version = "0.1.0"
+description = "Polestar decoding for dInfer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["polestar-dllm==0.1.0"]
+
+[project.urls]
+Repository = "https://github.com/gt-synergy-lab/Polestar"
+Upstream = "https://github.com/inclusionAI/dInfer"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+license-files = ["LICENSE"]
+
+[tool.setuptools.packages.find]
+where = ["python"]

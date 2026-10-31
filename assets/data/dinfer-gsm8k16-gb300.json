@@ -1,0 +1,31 @@
+{
+  "model": "GSAI-ML/LLaDA-8B-Instruct",
+  "task": "gsm8k",
+  "fewshot": 5,
+  "sample_count": 16,
+  "seed": 42,
+  "generation_length": 256,
+  "block_length": 32,
+  "confidence_threshold": 0.9,
+  "commit_lower_bound": 0.7,
+  "gpu": "NVIDIA GB300",
+  "protocol": "Sequential runs on one GPU; each prompt generated once before its timed, scored repeat.",
+  "baseline_dinfer": {
+    "flexible_extract_correct": 10,
+    "non_eos_tokens": 3785,
+    "model_forwards": 1477,
+    "warm_non_eos_tokens_per_second": 330.3156066424355,
+    "warm_capacity_positions_per_second": 359.3234927781735,
+    "measured_request_seconds": 11.38669693772681,
+    "identical_repeats": 16
+  },
+  "polestar_dinfer": {
+    "flexible_extract_correct": 12,
+    "non_eos_tokens": 3835,
+    "model_forwards": 1155,
+    "warm_non_eos_tokens_per_second": 383.4188897490109,
+    "warm_capacity_positions_per_second": 411.2649543676541,
+    "measured_request_seconds": 10.05689995829016,
+    "identical_repeats": 16
+  }
+}

@@ -44,7 +44,7 @@ def json_value(value):
     return str(value)
 
 
-def main():
+def main(*, llada_model_factory=None, llada_generate_fn=None, execution_metadata=None):
     parser = argparse.ArgumentParser(description="Evaluate Polestar")
     parser.add_argument("--config", default="configs/llada8b.json")
     parser.add_argument("--task", default="gsm8k")
@@ -128,6 +128,12 @@ def main():
                 steps=settings.get("steps", 256),
                 block_length=settings.get("block_length", 32),
                 show_speed=True,
+                enable_quantization=settings.get("enable_quantization", False),
+                quantization_precision=settings.get("quantization_precision", "fp4"),
+                enable_overlap=settings.get("enable_overlap", False),
+                enable_cuda_graphs=settings.get("enable_cuda_graphs", False),
+                model_factory=llada_model_factory,
+                generate_fn=llada_generate_fn,
                 **common,
             )
         else:
@@ -169,6 +175,8 @@ def main():
         "limit": args.limit,
         "predict_only": args.predict_only,
     }
+    if execution_metadata is not None:
+        results["polestar"]["execution"] = execution_metadata
     if config.model_type == "llada_v":
         results["polestar"]["scoring_models"] = suite.get("scoring_models", {})
     output.mkdir(parents=True, exist_ok=True)
