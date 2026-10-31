@@ -69,7 +69,7 @@ two upper layers for selective Cache refresh every eight decode forwards. Its
 prefix KV patches take effect on the next model forward. It stops after a
 fully committed EOS block, matching dInfer's baseline decoder. The standalone
 Polestar interface retains the paper's full-layer cache path; see the
-[system guide](../../docs/system.md).
+[LLaDA system presets](../../README.md#llada-system-presets).
 
 ## Check GSM8K
 

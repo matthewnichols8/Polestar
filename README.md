@@ -16,7 +16,7 @@ Mingyu Lee\*, Akshat Ramachandran\*, Souvik Kundu, and Tushar Krishna<br>
 Georgia Institute of Technology · Intel AI Group<br>
 \* Equal contribution
 
-**[Website](https://polestar-dllm.github.io/) · [Paper](https://arxiv.org/pdf/2607.14107) · [Video](#video) · [Results](#performance) · [Quickstart](#quickstart) · [Models](#models-and-examples) · [Evaluation](docs/evaluation.md) · [Method](docs/method.md)**
+**[Website](https://polestar-dllm.github.io/) · [Paper](https://arxiv.org/pdf/2607.14107) · [Video](#video) · [Results](#performance) · [Quickstart](#quickstart) · [Models](#models-and-examples) · [Evaluation](#evaluation) · [Method](#method-overview)**
 
 </div>
 
@@ -44,7 +44,7 @@ additional training.**
   <img src="assets/figures/polestar-overview.png" alt="Polestar-Cache and Polestar-Commit methodology" width="1000">
 </p>
 
-<p align="center"><em>Polestar-Cache and Polestar-Commit.</em> <a href="docs/method.md">Method</a></p>
+<p align="center"><em>Polestar-Cache and Polestar-Commit.</em> <a href="https://arxiv.org/pdf/2607.14107">Paper and algorithm</a></p>
 
 ## Performance
 
@@ -72,7 +72,11 @@ Across the paper's mathematics and coding benchmarks, Polestar achieves **up to 
 | LLaDA-V | MathVista | 63.58 | 2.17 | 37.91 |
 | LLaDA-V | MathVerse | 36.12 | 2.85 | 42.95 |
 
-<p align="center"><em>Paper results · NVIDIA A100 80GB · batch size 1 · text generation length 256.</em> <a href="docs/results.md">Full results and protocol</a></p>
+<p align="center"><em>Paper results · NVIDIA A100 80GB · batch size 1 · text generation length 256.</em> <a href="assets/data/table1.json">Full table data</a></p>
+
+TPF is non-EOS response tokens per model forward; TPS is non-EOS response
+tokens per second. See the [paper](https://arxiv.org/pdf/2607.14107) for the
+full evaluation protocol.
 
 ## Quickstart
 
@@ -91,18 +95,20 @@ python examples/generate.py --config configs/llada8b.json \
   --prompt "Natalia sold 48 clips in April and half as many in May. How many did she sell altogether?"
 ```
 
-The example prints the generated response followed by `Model evaluations: ...`. The checkpoint and tokenizer are loaded from Hugging Face and cached locally. Use a local checkpoint directory as `model_id` in the preset to load your own copy.
-
-For installation details, see [Installation](docs/installation.md).
+The example prints the generated response followed by `Model evaluations: ...`.
+The checkpoint and tokenizer are loaded from Hugging Face and cached locally.
+Set `HF_HOME` to a directory with room for the checkpoint, or set `model_id`
+in the preset to a local checkpoint directory. Install a CUDA-enabled PyTorch
+build compatible with your GPU before installing Polestar.
 
 ## Models and examples
 
 | Model | Input | Preset | Generate | Evaluate |
 |---|---|---|---|---|
-| LLaDA-8B-Instruct | Text | [llada8b.json](configs/llada8b.json) | [Text example](examples/generate.py) | [Text benchmarks](docs/evaluation.md#text-benchmarks) |
-| LLaDA-1.5 | Text | [llada15.json](configs/llada15.json) | [Text example](examples/generate.py) | [Text benchmarks](docs/evaluation.md#text-benchmarks) |
-| Dream-7B-Instruct | Text | [dream7b.json](configs/dream7b.json) | [Text example](examples/generate.py) | [Text benchmarks](docs/evaluation.md#text-benchmarks) |
-| LLaDA-V | Image + text | [llada-v.json](configs/llada-v.json) | [Image example](examples/image_generation.py) | [Image benchmarks](docs/evaluation.md#image-benchmarks) |
+| LLaDA-8B-Instruct | Text | [llada8b.json](configs/llada8b.json) | [Text example](examples/generate.py) | [Text benchmarks](#evaluation) |
+| LLaDA-1.5 | Text | [llada15.json](configs/llada15.json) | [Text example](examples/generate.py) | [Text benchmarks](#evaluation) |
+| Dream-7B-Instruct | Text | [dream7b.json](configs/dream7b.json) | [Text example](examples/generate.py) | [Text benchmarks](#evaluation) |
+| LLaDA-V | Image + text | [llada-v.json](configs/llada-v.json) | [Image example](examples/image_generation.py) | [Image benchmarks](#evaluation) |
 
 Switch text models by replacing the `--config` path in the quickstart. For an image-conditioned response with LLaDA-V:
 
@@ -112,13 +118,10 @@ python examples/image_generation.py --config configs/llada-v.json \
   --image path/to/image.jpg --prompt "Describe this image."
 ```
 
-See the [model guide](docs/models.md) for checkpoint, input, and generation settings.
-
-The [LLaDA system guide](docs/system.md) covers residual quantization, CPU
-offload, CUDA graphs, stream overlap, and dInfer. The fastest measured
-standalone preset on GB300 is
-[llada8b-cuda-graphs.json](configs/llada8b-cuda-graphs.json).
-Dream remains available through the same standalone API.
+Each preset sets `model_type`, a Hugging Face or local `model_id`, and
+generation length, steps, block length, and confidence thresholds. For a
+512-token response, set both `max_new_tokens` and `steps` to 512 in the
+preset. Dream uses the same standalone API.
 
 <details>
 <summary><b>Python API: load a preset and generate</b></summary>
@@ -133,6 +136,21 @@ print(result.text)
 ```
 
 </details>
+
+## LLaDA system presets
+
+| Preset | Cache path |
+|---|---|
+| [llada8b-cuda-graphs.json](configs/llada8b-cuda-graphs.json) | Fixed-shape CUDA graphs for decode projections |
+| [llada8b-stream-overlap.json](configs/llada8b-stream-overlap.json) | CUDA stream overlap |
+| [llada8b-nvfp4.json](configs/llada8b-nvfp4.json) | Centroid-residual NVFP4 simulation |
+| [llada8b-nvfp4-overlap.json](configs/llada8b-nvfp4-overlap.json) | Quantization, pinned-CPU offload, and overlap |
+
+With the CUDA-graph preset, standalone LLaDA scored 13/16 on a 5-shot GSM8K
+check on one GB300, with 3.332 non-EOS tokens per forward and 57.90 non-EOS
+tokens/s. This small check uses different hardware from the paper's full
+A100 evaluation. The offload path retains a GPU hidden-state copy for sparse
+patching, so it does not provide the paper's GPU-memory reduction.
 
 ## dInfer serving
 
@@ -154,18 +172,17 @@ python evaluation/run.py --config configs/llada8b.json --task gsm8k \
   --output-path results/llada8b-gsm8k-256
 ```
 
-Add `--limit 0.1` to run 10% of a benchmark, or `--limit 16` to run 16 examples. The evaluation presets specify few-shot counts and generation settings. [Evaluation](docs/evaluation.md) covers GSM8K, MATH, HumanEval, MBPP, MathVista, and MathVerse, including code postprocessing and result files.
+Add `--limit 16` for a short check, or `--limit 0.1` for 10% of the task.
+The text evaluation presets use 5-shot GSM8K, 4-shot MATH
+(`minerva_math`), 0-shot HumanEval, and 3-shot MBPP. Use
+`--allow-code-execution` when scoring generated programs with the benchmark's
+tests. The runner writes `results.json` and `samples_<task>.jsonl` to the
+output directory.
 
-## Documentation
-
-| Guide | What you'll find |
-|---|---|
-| [Installation](docs/installation.md) | Dependencies, CUDA setup, and environment options |
-| [Models](docs/models.md) | Checkpoints, text and image inputs, and generation presets |
-| [Method](docs/method.md) | Polestar-Cache, Polestar-Commit, and the implementation of Algorithm 1 |
-| [Evaluation](docs/evaluation.md) | Benchmark commands, task settings, scoring, and output files |
-| [Paper results](docs/results.md) | Accuracy, TPF, TPS, and measurement definitions |
-| [LLaDA system paths](docs/system.md) | CUDA presets, cache format, and dInfer |
+For LLaDA-V evaluation, install `'.[vision-eval]'` in a separate environment
+and run `evaluation/run.py` with `mathvista_testmini` or
+`mathverse_testmini_vision`. Those task scorers require `OPENAI_API_KEY`;
+`--predict-only` saves generations without scoring.
 
 Questions and contributions are welcome through [issues](https://github.com/gt-synergy-lab/Polestar/issues) and [pull requests](https://github.com/gt-synergy-lab/Polestar/pulls).
 

@@ -8,4 +8,4 @@ Polestar's original package interfaces, presets, and documentation use the root 
 | LLaDA-V language/vision model, multimodal preparation, and generation integration | [LLaDA-V](https://github.com/ML-GSAI/LLaDA-V) / source LLaVA implementation | Apache-2.0 |
 | LLaDA cache offload and Triton dequantization components; optional dInfer integration | Supplied `dllmKV` and `dInfer` system sources | Apache-2.0; the dInfer license is bundled in `integrations/dinfer/LICENSE` |
 
-Full license texts are in `LICENSES/`. File-level notices govern bundled third-party code. Model checkpoints, datasets, and separately installed evaluation libraries retain their own licenses and are not distributed with this repository.
+The bundled [dInfer Apache-2.0 license](integrations/dinfer/LICENSE) contains the full Apache-2.0 text applicable to the listed Apache-licensed components. File-level notices govern bundled third-party code. Model checkpoints, datasets, and separately installed evaluation libraries retain their own licenses and are not distributed with this repository.
