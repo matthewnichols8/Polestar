@@ -62,7 +62,8 @@ def test_prediction_mode_routes_to_harness_and_exports_samples(monkeypatch, tmp_
         SimpleNamespace(register_model=lambda settings: None, runtime_stats=lambda: {"total_nfe": 1}, create_task_manager=lambda settings: "configured task manager"),
     )
     preset = tmp_path / "model.json"
-    preset.write_text(json.dumps({"model_type": model_type, "model_id": "checkpoint"}))
+    generation = {"enable_cuda_graphs": True, "enable_fused_rope": True} if model_type == "dream" else {}
+    preset.write_text(json.dumps({"model_type": model_type, "model_id": "checkpoint", "generation": generation}))
     output = tmp_path / "run"
     monkeypatch.chdir(Path(__file__).parents[1])
     monkeypatch.setattr(
@@ -76,6 +77,9 @@ def test_prediction_mode_routes_to_harness_and_exports_samples(monkeypatch, tmp_
     assert calls[0]["limit"] == 0.1
     assert calls[0]["log_samples"] is True
     assert all(calls[0][key] == 17 for key in ["random_seed", "numpy_random_seed", "torch_random_seed", "fewshot_random_seed"])
+    if model_type == "dream":
+        assert calls[0]["model"]["enable_cuda_graphs"] is True
+        assert calls[0]["model"]["enable_fused_rope"] is True
     if model_type == "llada_v":
         assert calls[0]["cli_args"].output_path == str(output)
         assert "batch_size=" not in calls[0]["model_args"]

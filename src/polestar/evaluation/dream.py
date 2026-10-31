@@ -45,7 +45,41 @@ T = TypeVar('T', bound='LM')
 @register_model('polestar_dream')
 class Dream(LM):
 
-    def __init__(self, pretrained: Union[str, transformers.PreTrainedModel], batch_size: Optional[Union[int, str]]=1, device: Optional[str]='cuda', dtype: Optional[Union[str, torch.dtype]]='auto', max_new_tokens: Optional[int]=256, max_length: Optional[int]=2048, add_bos_token: Optional[bool]=False, nll_type: Optional[str]='mc', log_type: Optional[str]='ftb', mc_num: Optional[int]=128, classifier_free_guidance: Optional[float]=1.0, sampling_eps: Optional[float]=0.001, diffusion_steps: Optional[int]=256, trust_remote_code: Optional[bool]=True, parallelize: Optional[bool]=False, autogptq: Optional[Union[bool, str]]=False, temperature: Optional[float]=0.0, top_p: Optional[float]=None, top_k: Optional[float]=None, alg: Optional[str]='entropy', alg_temp: Optional[float]=0.0, escape_until: Optional[bool]=False, threshold: Optional[float]=0.9, threshold_early: Optional[float]=0.7, apply_chat_template: Optional[bool]=False, use_cache: Optional[bool]=True, dual_cache: Optional[bool]=True, use_cluster: Optional[bool]=True, save_dir: Optional[str]=None, **kwargs) -> None:
+    def __init__(
+        self,
+        pretrained: Union[str, transformers.PreTrainedModel],
+        batch_size: Optional[Union[int, str]] = 1,
+        device: Optional[str] = "cuda",
+        dtype: Optional[Union[str, torch.dtype]] = "auto",
+        max_new_tokens: Optional[int] = 256,
+        max_length: Optional[int] = 2048,
+        add_bos_token: Optional[bool] = False,
+        nll_type: Optional[str] = "mc",
+        log_type: Optional[str] = "ftb",
+        mc_num: Optional[int] = 128,
+        classifier_free_guidance: Optional[float] = 1.0,
+        sampling_eps: Optional[float] = 0.001,
+        diffusion_steps: Optional[int] = 256,
+        trust_remote_code: Optional[bool] = True,
+        parallelize: Optional[bool] = False,
+        autogptq: Optional[Union[bool, str]] = False,
+        temperature: Optional[float] = 0.0,
+        top_p: Optional[float] = None,
+        top_k: Optional[float] = None,
+        alg: Optional[str] = "entropy",
+        alg_temp: Optional[float] = 0.0,
+        escape_until: Optional[bool] = False,
+        threshold: Optional[float] = 0.9,
+        threshold_early: Optional[float] = 0.7,
+        apply_chat_template: Optional[bool] = False,
+        use_cache: Optional[bool] = True,
+        dual_cache: Optional[bool] = True,
+        use_cluster: Optional[bool] = True,
+        enable_cuda_graphs: bool = False,
+        enable_fused_rope: bool = False,
+        save_dir: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         super().__init__()
         assert isinstance(device, str)
         assert isinstance(pretrained, str)
@@ -130,6 +164,10 @@ class Dream(LM):
         self.nfe_total = 0
         self.conf_total = 0
         self.save_dir = save_dir
+        if enable_cuda_graphs:
+            self.model.prepare_decode_graphs(self.block_length)
+        if enable_fused_rope:
+            self.model.enable_fused_rope()
 
     @property
     def batch_size(self):

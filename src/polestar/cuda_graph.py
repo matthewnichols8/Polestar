@@ -1,4 +1,4 @@
-"""CUDA graph replay for fixed-shape, sequential LLaDA decode operations."""
+"""CUDA graph replay for fixed-shape, sequential decode operations."""
 
 from __future__ import annotations
 
@@ -40,6 +40,7 @@ class CapturedCall:
     def accepts(self, x: torch.Tensor) -> bool:
         return x.shape == self.input.shape and x.dtype == self.input.dtype and x.device == self.input.device
 
+    @torch.inference_mode()
     def __call__(self, x: torch.Tensor) -> CapturedOutput:
         if not self.accepts(x):
             raise ValueError("CUDA graph input shape, dtype, and device must match capture")

@@ -156,6 +156,18 @@ python evaluation/run.py --config configs/llada8b-cuda-graphs.json \
   --output-path results/polestar-gsm8k16
 ```
 
+For Dream, use the same evaluator with its CUDA graphs and fused rotary kernel:
+
+```bash
+python evaluation/run.py --config configs/dream7b-cuda-graphs.json \
+  --task gsm8k --limit 16 --seed 42 \
+  --output-path results/dream-gsm8k16
+```
+
+On one GB300, this Dream configuration produced the same answers as
+`configs/dream7b.json` on all 16 questions and reached 33.55 versus
+28.50 tokens per second. See the [run settings and results](assets/data/dream-gsm8k16-gb300.json).
+
 Compare dInfer with and without Polestar on the same questions:
 
 ```bash

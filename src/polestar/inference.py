@@ -75,8 +75,10 @@ def load_model(config: PolestarConfig, device: str = "cuda") -> tuple[Any, Any]:
         raise ValueError(f"Unsupported model_type: {config.model_type}")
 
     model = model_class.from_pretrained(config.model_id, **model_kwargs).to(device).eval()
-    if config.model_type == "llada" and config.generation.get("enable_cuda_graphs", False):
+    if config.model_type in {"llada", "dream"} and config.generation.get("enable_cuda_graphs", False):
         model.prepare_decode_graphs(config.generation["block_length"])
+    if config.model_type == "dream" and config.generation.get("enable_fused_rope", False):
+        model.enable_fused_rope()
     tokenizer = AutoTokenizer.from_pretrained(config.model_id, trust_remote_code=True)
     return model, tokenizer
 

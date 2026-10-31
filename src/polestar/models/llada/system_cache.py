@@ -15,7 +15,7 @@ from .system_clustering import (
     quantize_residual_given_clusters,
 )
 from .triton_quant import decode_packed_residuals
-from .cuda_graph import CapturedCall
+from ...cuda_graph import CapturedCall
 
 @dataclass
 class QuantizedOffloadState:

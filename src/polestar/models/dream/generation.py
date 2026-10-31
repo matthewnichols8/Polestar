@@ -499,6 +499,7 @@ class DreamGenerationMixin:
                             use_cache=True,
                             dual_cache=True,
                             replace_position=replace_position,
+                            block_range=(current_block_start, current_block_end),
                             use_cluster=False,
                         )
                         logits = shift_logits_for_generation(model_output.logits)
@@ -613,9 +614,11 @@ class DreamGenerationMixin:
                         use_cache=True,
                         dual_cache=True,
                         replace_position=replace_position,
+                        block_range=(current_block_start, current_block_end),
                         cluster=False,
                         efficient=True,
                         efficient_window_position=efficient_window_position,
+                        window_range=(block_prefix_window, block_suffix_window),
                         get_token_drift_score=True,
                     )
                     local_block_start = current_block_start - block_prefix_window
@@ -637,6 +640,7 @@ class DreamGenerationMixin:
                         use_cache=True,
                         dual_cache=True,
                         replace_position=replace_position,
+                        block_range=(current_block_start, current_block_end),
                         cluster=False,
                         get_token_drift_score=True,
                     )
@@ -667,9 +671,10 @@ class DreamGenerationMixin:
                         break
 
                     nfe += 1
-                    dec_tok_number_until_update += transfer_index.sum().item()
+                    transferred = transfer_index.sum().item()
+                    dec_tok_number_until_update += transferred
                     mask_index = (x[:, current_block_start:current_block_end] == mask_token_id)
-                    cluster = transfer_index.sum().item() > 1 or dec_tok_number_until_update > 2
+                    cluster = transferred > 1 or dec_tok_number_until_update > 2
                     if cluster:
                         dec_tok_number_until_update = 0
                     efficient = False
@@ -688,6 +693,7 @@ class DreamGenerationMixin:
                         use_cache=True,
                         dual_cache=True,
                         replace_position=replace_position,
+                        block_range=(current_block_start, current_block_end),
                         topk=topk,
                         cluster=cluster,
                         efficient=efficient,

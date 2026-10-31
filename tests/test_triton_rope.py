@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from polestar.models.llada.triton_rope import apply_rotary, triton
+from polestar.triton_rope import apply_rotary, triton
 
 
 @pytest.mark.skipif(not torch.cuda.is_available() or triton is None, reason="CUDA and Triton required")

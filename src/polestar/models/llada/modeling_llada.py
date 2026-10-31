@@ -33,7 +33,6 @@ from typing import (
     Union,
     cast,
 )
-from contextlib import contextmanager
 from dataclasses import dataclass, fields
 import torch
 import torch.backends.cuda
@@ -61,8 +60,8 @@ from .system_cache import (
     initialize_clustered_hidden_state,
     initialize_clustered_hidden_state_with_offload,
 )
-from .triton_rope import apply_rotary, triton as rope_triton
-from .cuda_graph import CapturedCall
+from ...triton_rope import apply_rotary, triton as rope_triton
+from ...cuda_graph import CapturedCall
 
 if sys.version_info.minor > 8:
     from collections.abc import MutableMapping
@@ -89,55 +88,6 @@ __all__ = [
 ]
 
 log = logging.getLogger(__name__)
-
-_SYSTEM_TIMING_ENABLED = False
-_SYSTEM_TIMING_RECORDS = []
-_SYSTEM_TIMING_CONTEXT = {}
-
-
-def configure_system_timing(enabled: bool, *, reset: bool = False):
-    """Enable CUDA-event timing for the existing systems-backend ranges."""
-    global _SYSTEM_TIMING_ENABLED
-    _SYSTEM_TIMING_ENABLED = enabled
-    if reset:
-        _SYSTEM_TIMING_RECORDS.clear()
-
-
-def set_system_profile_context(**context):
-    _SYSTEM_TIMING_CONTEXT.clear()
-    _SYSTEM_TIMING_CONTEXT.update(context)
-
-
-def collect_system_timing(*, synchronize: bool = True):
-    if synchronize and torch.cuda.is_available():
-        torch.cuda.synchronize()
-    records = []
-    for name, context, start, end in _SYSTEM_TIMING_RECORDS:
-        records.append(
-            {
-                "name": name,
-                **context,
-                "gpu_ms": start.elapsed_time(end),
-            }
-        )
-    return records
-
-
-@contextmanager
-def gpu_timing_range(name: str, enabled: bool = True):
-    timing = _SYSTEM_TIMING_ENABLED and enabled and torch.cuda.is_available()
-    if timing:
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
-        start.record(torch.cuda.current_stream())
-    try:
-        yield
-    finally:
-        if timing:
-            end.record(torch.cuda.current_stream())
-            _SYSTEM_TIMING_RECORDS.append(
-                (name, dict(_SYSTEM_TIMING_CONTEXT), start, end)
-            )
 
 def scaled_dot_product_attention(q, k, v, mask=None, attn_mask=None, dropout_p=0.0, is_causal=False):
     return F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, dropout_p=dropout_p, is_causal=is_causal)
@@ -1181,22 +1131,21 @@ class LLaDALlamaBlock(LLaDABlock):
         #    - KV cache
         #    - cluster centroids
         # ------------------------------------------------------------------
-        with gpu_timing_range(f"blk{layer_id}:state_patch", enabled=x.is_cuda):
-            if update_packet_prev is not None and hidden_state_past is not None and cluster and use_cluster:
-                hidden_state_past, clustered_hidden_state, layer_past = apply_state_patching(
-                    update_packet_prev=update_packet_prev,
-                    hidden_state_past=hidden_state_past,
-                    clustered_hidden_state=clustered_hidden_state,
-                    layer_past=layer_past,
-                    attn_norm=self.attn_norm,
-                    k_proj=self.k_proj,
-                    v_proj=self.v_proj,
-                    d_model=self.config.d_model,
-                    n_heads=self.config.n_heads,
-                    effective_n_kv_heads=self.config.effective_n_kv_heads,
-                    prefetched_h_old_raw=prefetched_h_old_raw,
-                    quant_offload_state=self._quant_offload_state if enable_quantization else None,
-                )
+        if update_packet_prev is not None and hidden_state_past is not None and cluster and use_cluster:
+            hidden_state_past, clustered_hidden_state, layer_past = apply_state_patching(
+                update_packet_prev=update_packet_prev,
+                hidden_state_past=hidden_state_past,
+                clustered_hidden_state=clustered_hidden_state,
+                layer_past=layer_past,
+                attn_norm=self.attn_norm,
+                k_proj=self.k_proj,
+                v_proj=self.v_proj,
+                d_model=self.config.d_model,
+                n_heads=self.config.n_heads,
+                effective_n_kv_heads=self.config.effective_n_kv_heads,
+                prefetched_h_old_raw=prefetched_h_old_raw,
+                quant_offload_state=self._quant_offload_state if enable_quantization else None,
+            )
 
         # ------------------------------------------------------------------
         # 2) Cache-step initialization (step 0)
@@ -1206,120 +1155,116 @@ class LLaDALlamaBlock(LLaDABlock):
         step0_event = None
         clustered_state_tmp = None
         offload_state_tmp = None
-        with gpu_timing_range(f"blk{layer_id}:step0_init", enabled=x.is_cuda):
-            if (
-                use_cache
-                and use_cluster
-                and hidden_state_past is None
-                and clustered_hidden_state is None
-                and replace_position is not None
-            ):
-                self.attn_weights = None
-                if enable_overlap and x.is_cuda:
-                    if self._step0_stream is None:
-                        self._step0_stream = torch.cuda.Stream(device=x.device)
-                    with torch.cuda.stream(self._step0_stream):
-                        with gpu_timing_range(f"blk{layer_id}:step0_cluster_offload_async", enabled=True):
-                            if enable_quantization:
-                                clustered_state_tmp, offload_state_tmp = initialize_clustered_hidden_state_with_offload(
-                                    x=x,
-                                    current_hidden_state=current_hidden_state,
-                                    replace_position=replace_position,
-                                    window_size=window_size,
-                                    target_total=8,
-                                    quantization_precision=quantization_precision,
-                                    group_size=16,
-                                    block_range=block_range,
-                                )
-                            else:
-                                clustered_state_tmp = initialize_clustered_hidden_state(
-                                    x=x,
-                                    current_hidden_state=current_hidden_state,
-                                    replace_position=replace_position,
-                                    window_size=window_size,
-                                    target_total=8,
-                                    enable_quantization=False,
-                                    quantization_precision=quantization_precision,
-                                    block_range=block_range,
-                                )
-                                offload_state_tmp = None
-                    step0_event = torch.cuda.Event()
-                    step0_event.record(self._step0_stream)
-                    step0_async_handle = (step0_event, clustered_state_tmp, offload_state_tmp)
-                else:
-                    clustered_hidden_state = initialize_clustered_hidden_state(
-                        x=x,
-                        current_hidden_state=current_hidden_state,
-                        replace_position=replace_position,
-                        window_size=window_size,
-                        target_total=8,
-                        enable_quantization=enable_quantization,
-                        quantization_precision=quantization_precision,
-                        block_range=block_range,
-                    )
+        if (
+            use_cache
+            and use_cluster
+            and hidden_state_past is None
+            and clustered_hidden_state is None
+            and replace_position is not None
+        ):
+            self.attn_weights = None
+            if enable_overlap and x.is_cuda:
+                if self._step0_stream is None:
+                    self._step0_stream = torch.cuda.Stream(device=x.device)
+                with torch.cuda.stream(self._step0_stream):
+                    if enable_quantization:
+                        clustered_state_tmp, offload_state_tmp = initialize_clustered_hidden_state_with_offload(
+                            x=x,
+                            current_hidden_state=current_hidden_state,
+                            replace_position=replace_position,
+                            window_size=window_size,
+                            target_total=8,
+                            quantization_precision=quantization_precision,
+                            group_size=16,
+                            block_range=block_range,
+                        )
+                    else:
+                        clustered_state_tmp = initialize_clustered_hidden_state(
+                            x=x,
+                            current_hidden_state=current_hidden_state,
+                            replace_position=replace_position,
+                            window_size=window_size,
+                            target_total=8,
+                            enable_quantization=False,
+                            quantization_precision=quantization_precision,
+                            block_range=block_range,
+                        )
+                        offload_state_tmp = None
+                step0_event = torch.cuda.Event()
+                step0_event.record(self._step0_stream)
+                step0_async_handle = (step0_event, clustered_state_tmp, offload_state_tmp)
+            else:
+                clustered_hidden_state = initialize_clustered_hidden_state(
+                    x=x,
+                    current_hidden_state=current_hidden_state,
+                    replace_position=replace_position,
+                    window_size=window_size,
+                    target_total=8,
+                    enable_quantization=enable_quantization,
+                    quantization_precision=quantization_precision,
+                    block_range=block_range,
+                )
 
         # ------------------------------------------------------------------
         # 3) Main transformer forward (attention + MLP)
         # ------------------------------------------------------------------
-        with gpu_timing_range(f"blk{layer_id}:main_attn", enabled=x.is_cuda):
-            if (
-                self._qkv_graph is not None
-                and layer_past is not None
-                and self._qkv_graph.accepts(x)
-            ):
-                q, k, v = self._qkv_graph(x)
-            else:
-                q, k, v = self._project_qkv(x)
-            attn_weights = None
-            rope_k = None
-            update_packet_L = None
-            attn_ready_event = torch.cuda.Event() if x.is_cuda and enable_overlap else None
+        if (
+            self._qkv_graph is not None
+            and layer_past is not None
+            and self._qkv_graph.accepts(x)
+        ):
+            q, k, v = self._qkv_graph(x)
+        else:
+            q, k, v = self._project_qkv(x)
+        attn_weights = None
+        rope_k = None
+        update_packet_L = None
+        attn_ready_event = torch.cuda.Event() if x.is_cuda and enable_overlap else None
 
-            if self._activation_checkpoint_fn is not None:
-                att, cache = self._activation_checkpoint_fn(  # type: ignore
-                    self.attention,
-                    q,
-                    k,
-                    v,
-                    attention_bias,
-                    layer_past=layer_past,
-                    use_cache=use_cache,
-                    replace_position=attention_replace_position,
-                    cache_range=attention_cache_range,
-                    proxy_ready_event=attn_ready_event,
-                )
-            else:
-                att, cache, attn_weights, rope_k = self.attention(
-                    q,
-                    k,
-                    v,
-                    attention_bias,
-                    layer_past=layer_past,
-                    use_cache=use_cache,
-                    replace_position=attention_replace_position,
-                    cache_range=attention_cache_range,
-                    proxy_ready_event=attn_ready_event,
-                    output_attentions=(
-                        use_cache
-                        and get_token_drift_score
-                        and layer_id == self.config.n_layers - 1
-                    ),
-                )
+        if self._activation_checkpoint_fn is not None:
+            att, cache = self._activation_checkpoint_fn(  # type: ignore
+                self.attention,
+                q,
+                k,
+                v,
+                attention_bias,
+                layer_past=layer_past,
+                use_cache=use_cache,
+                replace_position=attention_replace_position,
+                cache_range=attention_cache_range,
+                proxy_ready_event=attn_ready_event,
+            )
+        else:
+            att, cache, attn_weights, rope_k = self.attention(
+                q,
+                k,
+                v,
+                attention_bias,
+                layer_past=layer_past,
+                use_cache=use_cache,
+                replace_position=attention_replace_position,
+                cache_range=attention_cache_range,
+                proxy_ready_event=attn_ready_event,
+                output_attentions=(
+                    use_cache
+                    and get_token_drift_score
+                    and layer_id == self.config.n_layers - 1
+                ),
+            )
         # Queue the main FFN before proxy selection. Proxy selection reads a dynamic
         # GPU index count on the host, so queuing it first would leave the main
         # stream idle while the host waits for that count.
-        with gpu_timing_range(f"blk{layer_id}:main_ffn", enabled=x.is_cuda):
-            x = x + self.dropout(att)
-            if self._activation_checkpoint_fn is not None:
-                residual = x
-                x = self._activation_checkpoint_fn(self.ff_norm, x)  # type: ignore
-                x, x_up = self.ff_proj(x), self.up_proj(x)
-                x = self._activation_checkpoint_fn(self.act, x)  # type: ignore
-                x = residual + self.dropout(self.ff_out(x * x_up))
-            elif self._ffn_graph is not None and self._ffn_graph.accepts(x):
-                x = self._ffn_graph(x)
-            else:
-                x = self._feed_forward(x)
+        x = x + self.dropout(att)
+        if self._activation_checkpoint_fn is not None:
+            residual = x
+            x = self._activation_checkpoint_fn(self.ff_norm, x)  # type: ignore
+            x, x_up = self.ff_proj(x), self.up_proj(x)
+            x = self._activation_checkpoint_fn(self.act, x)  # type: ignore
+            x = residual + self.dropout(self.ff_out(x * x_up))
+        elif self._ffn_graph is not None and self._ffn_graph.accepts(x):
+            x = self._ffn_graph(x)
+        else:
+            x = self._feed_forward(x)
 
         # Launch proxy-attention/update-packet path on a side stream so it can overlap with FFN.
         proxy_async_handle = None
@@ -1347,33 +1292,32 @@ class LLaDALlamaBlock(LLaDABlock):
                     self._proxy_stream.wait_event(attn_ready_event)
                 if step0_event is not None:
                     self._proxy_stream.wait_event(step0_event)
-                with gpu_timing_range(f"blk{layer_id}:proxy_update_async", enabled=True):
-                    prev_attn_scores = getattr(self, "_prev_attn_scores", None)
-                    update_packet_tmp, prev_scores_tmp = build_cluster_update_packet(
-                        clustered_hidden_state=clustered_hidden_for_proxy,
-                        cache=cache,
-                        hidden_state_past=hidden_state_past,
-                        replace_position=replace_position,
-                        topk=topk,
-                        rope_k=rope_k,
-                        attn_norm=self.attn_norm,
-                        q_proj=self.q_proj,
-                        ff_norm=self.ff_norm,
-                        ff_proj=self.ff_proj,
-                        up_proj=self.up_proj,
-                        act=self.act,
-                        ff_out=self.ff_out,
-                        attn_out=self.attn_out,
-                        dropout=self.dropout,
-                        rotary_emb=self.rotary_emb,
-                        scaled_dot_product_attention_fn=self._scaled_dot_product_attention,
-                        d_model=self.config.d_model,
-                        n_heads=self.config.n_heads,
-                        prev_attn_scores=prev_attn_scores,
-                        quant_offload_state=quant_offload_for_proxy,
-                        use_triton_dequant=True,
-                        centroid_q_graph=None,
-                    )
+                prev_attn_scores = getattr(self, "_prev_attn_scores", None)
+                update_packet_tmp, prev_scores_tmp = build_cluster_update_packet(
+                    clustered_hidden_state=clustered_hidden_for_proxy,
+                    cache=cache,
+                    hidden_state_past=hidden_state_past,
+                    replace_position=replace_position,
+                    topk=topk,
+                    rope_k=rope_k,
+                    attn_norm=self.attn_norm,
+                    q_proj=self.q_proj,
+                    ff_norm=self.ff_norm,
+                    ff_proj=self.ff_proj,
+                    up_proj=self.up_proj,
+                    act=self.act,
+                    ff_out=self.ff_out,
+                    attn_out=self.attn_out,
+                    dropout=self.dropout,
+                    rotary_emb=self.rotary_emb,
+                    scaled_dot_product_attention_fn=self._scaled_dot_product_attention,
+                    d_model=self.config.d_model,
+                    n_heads=self.config.n_heads,
+                    prev_attn_scores=prev_attn_scores,
+                    quant_offload_state=quant_offload_for_proxy,
+                    use_triton_dequant=True,
+                    centroid_q_graph=None,
+                )
             proxy_event = torch.cuda.Event()
             proxy_event.record(self._proxy_stream)
             proxy_async_handle = (proxy_event, update_packet_tmp, prev_scores_tmp)
@@ -1410,20 +1354,18 @@ class LLaDALlamaBlock(LLaDABlock):
         # 4) Cluster-based update packet construction
         # ------------------------------------------------------------------
         if proxy_async_handle is not None:
-            with gpu_timing_range(f"blk{layer_id}:proxy_sync", enabled=x.is_cuda):
-                proxy_event, update_packet_tmp, prev_scores_tmp = proxy_async_handle
-                torch.cuda.current_stream(x.device).wait_event(proxy_event)
-                update_packet_L = update_packet_tmp
-                self._prev_attn_scores = prev_scores_tmp
+            proxy_event, update_packet_tmp, prev_scores_tmp = proxy_async_handle
+            torch.cuda.current_stream(x.device).wait_event(proxy_event)
+            update_packet_L = update_packet_tmp
+            self._prev_attn_scores = prev_scores_tmp
             if step0_async_handle is not None:
                 clustered_hidden_state = clustered_state_tmp
                 self._quant_offload_state = offload_state_tmp
         else:
             if step0_async_handle is not None:
-                with gpu_timing_range(f"blk{layer_id}:step0_sync", enabled=x.is_cuda):
-                    torch.cuda.current_stream(x.device).wait_event(step0_event)
-                    clustered_hidden_state = clustered_state_tmp
-                    self._quant_offload_state = offload_state_tmp
+                torch.cuda.current_stream(x.device).wait_event(step0_event)
+                clustered_hidden_state = clustered_state_tmp
+                self._quant_offload_state = offload_state_tmp
 
             if (
                 use_cache
@@ -1433,33 +1375,32 @@ class LLaDALlamaBlock(LLaDABlock):
                 and (cluster or hidden_state_past is None)
                 and rope_k is not None
             ):
-                with gpu_timing_range(f"blk{layer_id}:proxy_update_sync", enabled=x.is_cuda):
-                    prev_attn_scores = getattr(self, "_prev_attn_scores", None)
-                    update_packet_L, self._prev_attn_scores = build_cluster_update_packet(
-                        clustered_hidden_state=clustered_hidden_state,
-                        cache=cache,
-                        hidden_state_past=hidden_state_past,
-                        replace_position=replace_position,
-                        topk=topk,
-                        rope_k=rope_k,
-                        attn_norm=self.attn_norm,
-                        q_proj=self.q_proj,
-                        ff_norm=self.ff_norm,
-                        ff_proj=self.ff_proj,
-                        up_proj=self.up_proj,
-                        act=self.act,
-                        ff_out=self.ff_out,
-                        attn_out=self.attn_out,
-                        dropout=self.dropout,
-                        rotary_emb=self.rotary_emb,
-                        scaled_dot_product_attention_fn=self._scaled_dot_product_attention,
-                        d_model=self.config.d_model,
-                        n_heads=self.config.n_heads,
-                        prev_attn_scores=prev_attn_scores,
-                        quant_offload_state=self._quant_offload_state if enable_quantization else None,
-                        use_triton_dequant=True,
-                        centroid_q_graph=self._centroid_q_graph,
-                    )
+                prev_attn_scores = getattr(self, "_prev_attn_scores", None)
+                update_packet_L, self._prev_attn_scores = build_cluster_update_packet(
+                    clustered_hidden_state=clustered_hidden_state,
+                    cache=cache,
+                    hidden_state_past=hidden_state_past,
+                    replace_position=replace_position,
+                    topk=topk,
+                    rope_k=rope_k,
+                    attn_norm=self.attn_norm,
+                    q_proj=self.q_proj,
+                    ff_norm=self.ff_norm,
+                    ff_proj=self.ff_proj,
+                    up_proj=self.up_proj,
+                    act=self.act,
+                    ff_out=self.ff_out,
+                    attn_out=self.attn_out,
+                    dropout=self.dropout,
+                    rotary_emb=self.rotary_emb,
+                    scaled_dot_product_attention_fn=self._scaled_dot_product_attention,
+                    d_model=self.config.d_model,
+                    n_heads=self.config.n_heads,
+                    prev_attn_scores=prev_attn_scores,
+                    quant_offload_state=self._quant_offload_state if enable_quantization else None,
+                    use_triton_dequant=True,
+                    centroid_q_graph=self._centroid_q_graph,
+                )
 
         # Output contract:
         # - next layer receives `x` and `update_packet_L`
@@ -1902,10 +1843,9 @@ class LLaDAModel(nn.Module):
                     layer_clustered_hidden_state = clustered_hidden_states[block_idx]
                 prefetched_h_old_raw = None
                 if block_idx in prefetched_h_old_by_layer:
-                    with gpu_timing_range(f"layer{block_idx}:prefetch_wait", enabled=x.is_cuda):
-                        prefetched_h_old_raw, prefetch_event = prefetched_h_old_by_layer.pop(block_idx)
-                        if x.is_cuda:
-                            torch.cuda.current_stream(x.device).wait_event(prefetch_event)
+                    prefetched_h_old_raw, prefetch_event = prefetched_h_old_by_layer.pop(block_idx)
+                    if x.is_cuda:
+                        torch.cuda.current_stream(x.device).wait_event(prefetch_event)
 
                 if (
                     (self.activation_checkpointing_strategy == ActivationCheckpointingStrategy.whole_layer)
@@ -1923,55 +1863,53 @@ class LLaDAModel(nn.Module):
                     )
                 ):
                     # shape: (batch_size, seq_len, d_model)
-                    with gpu_timing_range(f"layer{block_idx}:block_forward_ckpt", enabled=x.is_cuda):
-                        x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet = self._activation_checkpoint_fn(
-                            block,
-                            x,
-                            attention_bias=attention_bias,
-                            layer_past=layer_past,
-                            use_cache=use_cache,
-                            transfer_index=transfer_index,
-                            layer_id=block_idx,
-                            replace_position=replace_position,
-                            hidden_state_past=hidden_state_past,
-                            clustered_hidden_state=layer_clustered_hidden_state,
-                            update_packet_prev=update_packet,
-                            cluster=cluster,
-                            topk=topk,
-                            efficient=efficient,
-                            get_token_drift_score=get_token_drift_score,
-                            use_cluster=use_cluster,
-                            enable_quantization=enable_quantization,
-                            quantization_precision=quantization_precision,
-                            enable_overlap=enable_overlap,
-                            prefetched_h_old_raw=prefetched_h_old_raw,
-                            block_range=block_range,
-                        )
+                    x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet = self._activation_checkpoint_fn(
+                        block,
+                        x,
+                        attention_bias=attention_bias,
+                        layer_past=layer_past,
+                        use_cache=use_cache,
+                        transfer_index=transfer_index,
+                        layer_id=block_idx,
+                        replace_position=replace_position,
+                        hidden_state_past=hidden_state_past,
+                        clustered_hidden_state=layer_clustered_hidden_state,
+                        update_packet_prev=update_packet,
+                        cluster=cluster,
+                        topk=topk,
+                        efficient=efficient,
+                        get_token_drift_score=get_token_drift_score,
+                        use_cluster=use_cluster,
+                        enable_quantization=enable_quantization,
+                        quantization_precision=quantization_precision,
+                        enable_overlap=enable_overlap,
+                        prefetched_h_old_raw=prefetched_h_old_raw,
+                        block_range=block_range,
+                    )
                 else:
                     # shape: (batch_size, seq_len, d_model)
-                    with gpu_timing_range(f"layer{block_idx}:block_forward", enabled=x.is_cuda):
-                        x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet, drift_score = block(
-                            x,
-                            attention_bias=attention_bias,
-                            layer_past=layer_past,
-                            use_cache=use_cache,
-                            transfer_index=transfer_index,
-                            layer_id=block_idx,
-                            replace_position=replace_position,
-                            hidden_state_past=hidden_state_past,
-                            clustered_hidden_state=layer_clustered_hidden_state,
-                            update_packet_prev=update_packet,
-                            cluster=cluster,
-                            topk=topk,
-                            efficient=efficient,
-                            get_token_drift_score=get_token_drift_score,
-                            use_cluster=use_cluster,
-                            enable_quantization=enable_quantization,
-                            quantization_precision=quantization_precision,
-                            enable_overlap=enable_overlap,
-                            prefetched_h_old_raw=prefetched_h_old_raw,
-                            block_range=block_range,
-                        )
+                    x, cache, hidden_state_past_new, clustered_hidden_state_new, update_packet, drift_score = block(
+                        x,
+                        attention_bias=attention_bias,
+                        layer_past=layer_past,
+                        use_cache=use_cache,
+                        transfer_index=transfer_index,
+                        layer_id=block_idx,
+                        replace_position=replace_position,
+                        hidden_state_past=hidden_state_past,
+                        clustered_hidden_state=layer_clustered_hidden_state,
+                        update_packet_prev=update_packet,
+                        cluster=cluster,
+                        topk=topk,
+                        efficient=efficient,
+                        get_token_drift_score=get_token_drift_score,
+                        use_cluster=use_cluster,
+                        enable_quantization=enable_quantization,
+                        quantization_precision=quantization_precision,
+                        enable_overlap=enable_overlap,
+                        prefetched_h_old_raw=prefetched_h_old_raw,
+                        block_range=block_range,
+                    )
                 if attn_key_values is not None:
                     assert cache is not None
                     attn_key_values.append(cache)
@@ -2006,8 +1944,7 @@ class LLaDAModel(nn.Module):
                         ]
                     prefetch_stream = self._prefetch_streams[block_idx % len(self._prefetch_streams)]
                     with torch.cuda.stream(prefetch_stream):
-                        with gpu_timing_range(f"layer{block_idx}:next_hold_prefetch_async", enabled=True):
-                            h_old_next = next_hidden[:, idx_upd, :].contiguous()
+                        h_old_next = next_hidden[:, idx_upd, :].contiguous()
                     prefetch_event = torch.cuda.Event()
                     prefetch_event.record(prefetch_stream)
                     prefetched_h_old_by_layer[block_idx + 1] = (h_old_next, prefetch_event)

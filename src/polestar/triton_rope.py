@@ -1,4 +1,4 @@
-"""Fuse LLaDA rotary embedding reads, rotation, and dtype conversion."""
+"""Fuse rotary embedding reads, rotation, and dtype conversion."""
 
 from __future__ import annotations
 

@@ -144,6 +144,8 @@ def main(*, llada_model_factory=None, llada_generate_fn=None, execution_metadata
                 diffusion_steps=settings.get("steps", 256),
                 block_length=settings.get("block_length", 32),
                 temperature=settings.get("temperature", 0.0),
+                enable_cuda_graphs=settings.get("enable_cuda_graphs", False),
+                enable_fused_rope=settings.get("enable_fused_rope", False),
                 add_bos_token=True,
                 alg="confidence_threshold",
                 **common,

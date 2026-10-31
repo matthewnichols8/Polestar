@@ -47,6 +47,8 @@ from .generation import DreamGenerationMixin, DreamGenerationConfig
 if is_flash_attn_2_available():
     from transformers.modeling_flash_attention_utils import _flash_attention_forward
 from .clustering import cluster_past_hidden_states
+from ...cuda_graph import CapturedCall
+from ...triton_rope import apply_rotary, triton as rope_triton
 
 logger = logging.get_logger(__name__)
 
@@ -386,6 +388,26 @@ class DreamSdpaAttention(DreamAttention):
     SDPA API.
     """
 
+    def __init__(self, config: DreamConfig, layer_idx: Optional[int] = None):
+        super().__init__(config, layer_idx)
+        self._qkv_graph: Optional[CapturedCall] = None
+        self._fused_rope = False
+
+    def _project_qkv(self, hidden: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return self.q_proj(hidden), self.k_proj(hidden), self.v_proj(hidden)
+
+    def prepare_decode_graph(self, block_length: int) -> None:
+        weight = self.q_proj.weight
+        if self.training or weight.device.type != "cuda":
+            raise ValueError("Dream graph capture requires an eval model on CUDA")
+        self._qkv_graph = CapturedCall(
+            self._project_qkv,
+            length=block_length,
+            width=self.hidden_size,
+            device=weight.device,
+            dtype=weight.dtype,
+        )
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -401,6 +423,7 @@ class DreamSdpaAttention(DreamAttention):
         layer_id: Optional[int] = None,
         hidden_state_past: Optional[torch.Tensor] = None,
         output_attn_weights: bool = False,
+        cached_replace_indices: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         if output_attentions:
 
@@ -419,13 +442,19 @@ class DreamSdpaAttention(DreamAttention):
 
         bsz, q_len, _ = hidden_states.size()
 
-        query_states = self.q_proj(hidden_states)
-        key_states = self.k_proj(hidden_states)
-        value_states = self.v_proj(hidden_states)
-        replace_indices = None
+        if (
+            dual_cache
+            and past_key_value is not None
+            and self._qkv_graph is not None
+            and self._qkv_graph.accepts(hidden_states)
+        ):
+            query_states, key_states, value_states = self._qkv_graph(hidden_states)
+        else:
+            query_states, key_states, value_states = self._project_qkv(hidden_states)
+        replace_indices = cached_replace_indices
         had_past_key_value = past_key_value is not None
 
-        if dual_cache and replace_position is not None:
+        if dual_cache and replace_position is not None and replace_indices is None:
             replace_indices = replace_position.nonzero(as_tuple=True)[1]
 
         if past_key_value is not None:
@@ -457,12 +486,22 @@ class DreamSdpaAttention(DreamAttention):
         else:
             cos, sin = position_embeddings
 
-        if dual_cache and had_past_key_value and replace_indices is not None and replace_indices.numel() > 0:
+        if self._fused_rope and rope_triton is not None and query_states.is_cuda and bsz == 1:
+            if dual_cache and had_past_key_value and replace_indices is not None and replace_indices.numel() > 0:
+                query_states = apply_rotary(
+                    query_states, sin[0], cos[0],
+                    positions=replace_indices, full_precision=False,
+                )
+            else:
+                query_states = apply_rotary(
+                    query_states, sin[0], cos[0],
+                    position_start=key_states.shape[-2] - q_len,
+                    full_precision=False,
+                )
+            key_states = apply_rotary(key_states, sin[0], cos[0], full_precision=False)
+        elif dual_cache and had_past_key_value and replace_indices is not None and replace_indices.numel() > 0:
             query_states, key_states = apply_rotary_pos_emb(
-                query_states,
-                key_states,
-                cos,
-                sin,
+                query_states, key_states, cos, sin,
                 block_end_index=replace_indices.max() + 1,
             )
         else:
@@ -516,6 +555,25 @@ class DreamDecoderLayer(nn.Module):
         self.mlp = DreamMLP(config)
         self.input_layernorm = DreamRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = DreamRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self._ffn_graph: Optional[CapturedCall] = None
+
+    def _feed_forward(self, residual: torch.Tensor) -> torch.Tensor:
+        return residual + self.mlp(self.post_attention_layernorm(residual))
+
+    def prepare_decode_graph(self, block_length: int) -> None:
+        if self.training:
+            raise ValueError("Dream graph capture requires an eval model")
+        self.self_attn.prepare_decode_graph(block_length)
+        weight = self.mlp.gate_proj.weight
+        self._ffn_graph = CapturedCall(
+            self._feed_forward,
+            length=block_length,
+            width=self.hidden_size,
+            device=weight.device,
+            dtype=weight.dtype,
+            # The next layer may retain this output in its hidden-state cache.
+            clone_output=True,
+        )
 
     def forward(
         self,
@@ -540,6 +598,9 @@ class DreamDecoderLayer(nn.Module):
         efficient_window_position: Optional[torch.Tensor] = None,
         get_token_drift_score: bool = False,
         use_cluster: bool = True,
+        block_range: Optional[Tuple[int, int]] = None,
+        window_range: Optional[Tuple[int, int]] = None,
+        cached_replace_indices: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         """
@@ -601,9 +662,6 @@ class DreamDecoderLayer(nn.Module):
                     k_new_raw = self.self_attn.k_proj(h_new_norm)
                     v_new_raw = self.self_attn.v_proj(h_new_norm)
 
-                    Lpk = pk.shape[1]
-                    assert idx.max().item() < Lpk, f"idx max {idx.max().item()} >= cache len {Lpk}"
-
                     pk = pk.clone()
                     pv = pv.clone()
                     pk[:, idx, :] = k_new_raw
@@ -646,15 +704,21 @@ class DreamDecoderLayer(nn.Module):
             current_hidden_state = hidden_states if use_cache else None
             block_mask = replace_position[0]
             L_total = block_mask.size(0)
-            block_pos = block_mask.nonzero(as_tuple=True)[0]
-            curr_start = block_pos[0].item()
-            curr_end = block_pos[-1].item() + 1
+            if block_range is None:
+                block_pos = block_mask.nonzero(as_tuple=True)[0]
+                curr_start = block_pos[0].item()
+                curr_end = block_pos[-1].item() + 1
+            else:
+                curr_start, curr_end = block_range
 
             window_size = 32
             if efficient and efficient_window_position is not None:
-                window_pos = efficient_window_position[0].nonzero(as_tuple=True)[0]
-                w_start = window_pos[0].item()
-                w_end = window_pos[-1].item() + 1
+                if window_range is None:
+                    window_pos = efficient_window_position[0].nonzero(as_tuple=True)[0]
+                    w_start = window_pos[0].item()
+                    w_end = window_pos[-1].item() + 1
+                else:
+                    w_start, w_end = window_range
                 local_q_start = curr_start - w_start
                 local_q_end = curr_end - w_start
                 window_replace_position = efficient_window_position
@@ -724,22 +788,26 @@ class DreamDecoderLayer(nn.Module):
             layer_id=layer_id,
             hidden_state_past=hidden_state_past,
             output_attn_weights=get_token_drift_score and layer_id == self.self_attn.config.num_hidden_layers - 1,
+            cached_replace_indices=cached_replace_indices if not efficient else None,
         )
         hidden_states = residual + hidden_states
 
-        residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
-        hidden_states = residual + hidden_states
+        if dual_cache and self._ffn_graph is not None and self._ffn_graph.accepts(hidden_states):
+            hidden_states = self._ffn_graph(hidden_states)
+        else:
+            hidden_states = self._feed_forward(hidden_states)
 
         drift_score = None
         if attn_weights is not None and get_token_drift_score and layer_id == self.self_attn.config.num_hidden_layers - 1:
             block_mask = replace_position[0] if replace_position is not None else None
             if block_mask is not None:
                 L_total = block_mask.size(0)
-                block_pos = block_mask.nonzero(as_tuple=True)[0]
-                curr_start = block_pos[0].item()
-                curr_end = block_pos[-1].item() + 1
+                if block_range is None:
+                    block_pos = block_mask.nonzero(as_tuple=True)[0]
+                    curr_start = block_pos[0].item()
+                    curr_end = block_pos[-1].item() + 1
+                else:
+                    curr_start, curr_end = block_range
                 if attn_weights.size(-2) == L_total:
                     attn_weights = attn_weights[:, :, curr_start:curr_end, :]
                 elif efficient and local_q_start is not None and local_q_end is not None:
@@ -1017,6 +1085,8 @@ class DreamBaseModel(DreamPreTrainedModel):
         cache_position: Optional[torch.LongTensor] = None,
         dual_cache: Optional[bool] = False,
         replace_position: Optional[torch.Tensor] = None,
+        block_range: Optional[Tuple[int, int]] = None,
+        window_range: Optional[Tuple[int, int]] = None,
     ) -> Union[Tuple, BaseModelOutput]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1062,6 +1132,17 @@ class DreamBaseModel(DreamPreTrainedModel):
             position_ids_full = torch.arange(L, device=inputs_embeds.device).unsqueeze(0)
             dummy = inputs_embeds.new_empty((inputs_embeds.size(0), L, inputs_embeds.size(-1)))
             position_embeddings_for_cluster = self.rotary_emb(dummy, position_ids_full)
+
+        block_positions = None
+        if replace_position is not None:
+            if block_range is None:
+                block_positions = replace_position[0].nonzero(as_tuple=True)[0]
+                block_range = (block_positions[0].item(), block_positions[-1].item() + 1)
+            else:
+                block_positions = torch.arange(*block_range, device=replace_position.device)
+        if efficient and efficient_window_position is not None and window_range is None:
+            window_positions = efficient_window_position[0].nonzero(as_tuple=True)[0]
+            window_range = (window_positions[0].item(), window_positions[-1].item() + 1)
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -1112,6 +1193,9 @@ class DreamBaseModel(DreamPreTrainedModel):
                     position_embeddings_for_cluster=position_embeddings_for_cluster,
                     get_token_drift_score=get_token_drift_score,
                     use_cluster=use_cluster,
+                    block_range=block_range,
+                    window_range=window_range,
+                    cached_replace_indices=block_positions,
                 )
 
             hidden_states = layer_outputs[0]
@@ -1174,6 +1258,18 @@ class DreamModel(DreamGenerationMixin, DreamPreTrainedModel):
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
         self.post_init()
+
+    @torch.inference_mode()
+    def prepare_decode_graphs(self, block_length: int) -> None:
+        """Capture fixed-shape projection and MLP work after loading CUDA weights."""
+        for layer in self.model.layers:
+            layer.prepare_decode_graph(block_length)
+
+    def enable_fused_rope(self) -> None:
+        if not next(self.parameters()).is_cuda or rope_triton is None:
+            raise ValueError("Dream fused rotary embeddings require CUDA and Triton")
+        for layer in self.model.layers:
+            layer.self_attn._fused_rope = True
 
     def reset_rope_parameters(self):
         self.model.rotary_emb.reset_parameters()
@@ -1248,6 +1344,8 @@ class DreamModel(DreamGenerationMixin, DreamPreTrainedModel):
             cache_position=cache_position,
             dual_cache=dual_cache,
             replace_position=replace_position,
+            block_range=loss_kwargs.get("block_range"),
+            window_range=loss_kwargs.get("window_range"),
         )
         hidden_states = outputs[0]
 

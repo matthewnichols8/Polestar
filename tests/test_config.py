@@ -13,6 +13,7 @@ from polestar import PolestarConfig
     "llada8b-nvfp4-overlap.json",
     "llada15.json",
     "dream7b.json",
+    "dream7b-cuda-graphs.json",
     "llada-v.json",
 ])
 def test_model_presets(filename):
@@ -37,3 +38,9 @@ def test_configuration_roundtrip(tmp_path):
     path = tmp_path / "preset.json"
     path.write_text(json.dumps(data))
     assert PolestarConfig.from_json(path).generation == data["generation"]
+
+
+def test_dream_cuda_graphs_are_supported():
+    config = PolestarConfig("dream", "checkpoint", {"enable_cuda_graphs": True, "enable_fused_rope": True})
+    assert config.generation["enable_cuda_graphs"]
+    assert config.generation["enable_fused_rope"]

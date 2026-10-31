@@ -30,7 +30,7 @@ class PolestarConfig:
             raise ValueError("max_new_tokens must be divisible by block_length")
         if steps % (length // block):
             raise ValueError("steps must be divisible by the number of generation blocks")
-        for option in ("enable_quantization", "enable_overlap", "enable_cuda_graphs"):
+        for option in ("enable_quantization", "enable_overlap", "enable_cuda_graphs", "enable_fused_rope"):
             if option in self.generation and not isinstance(self.generation[option], bool):
                 raise ValueError(f"{option} must be a boolean")
         precision = self.generation.get("quantization_precision", "fp4")
@@ -38,9 +38,13 @@ class PolestarConfig:
             raise ValueError("quantization_precision must be fp4 or int2")
         if self.model_type != "llada" and any(
             option in self.generation
-            for option in ("enable_quantization", "quantization_precision", "enable_overlap", "enable_cuda_graphs")
+            for option in ("enable_quantization", "quantization_precision", "enable_overlap")
         ):
             raise ValueError("system cache options currently require model_type llada")
+        if self.model_type == "llada_v" and "enable_cuda_graphs" in self.generation:
+            raise ValueError("CUDA graph capture currently supports text models")
+        if self.model_type != "dream" and "enable_fused_rope" in self.generation:
+            raise ValueError("Dream's fused rotary path requires model_type dream")
 
     @classmethod
     def from_json(cls, path: str | Path) -> "PolestarConfig":
