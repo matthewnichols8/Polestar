@@ -16,7 +16,7 @@ Mingyu Lee\*, Akshat Ramachandran\*, Souvik Kundu, and Tushar Krishna<br>
 Georgia Institute of Technology · Intel AI Group<br>
 \* Equal contribution
 
-**[Website](https://polestar-dllm.github.io/) · [Paper](https://arxiv.org/pdf/2607.14107) · [Video](#video) · [Results](#performance) · [Quickstart](#quickstart) · [Models](#models-and-examples) · [Evaluation](#evaluation) · [Method](#method-overview)**
+**[Website](https://polestar-dllm.github.io/) · [Paper](https://arxiv.org/pdf/2607.14107) · [Video](#video) · [Results](#performance) · [Quickstart](#quickstart) · [Models](#models-and-examples) · [Benchmarks](#performance-benchmarking) · [Evaluation](#evaluation) · [Method](#method-overview)**
 
 </div>
 
@@ -75,9 +75,9 @@ Across the paper's mathematics and coding benchmarks, Polestar achieves **up to 
 
 <p align="center"><em>Paper results · NVIDIA A100 80GB · batch size 1 · text generation length 256.</em> <a href="assets/data/table1.json">Full table data</a></p>
 
-TPF is non-EOS response tokens per model forward; TPS is non-EOS response
-tokens per second. See the [paper](https://arxiv.org/pdf/2607.14107) for the
-full evaluation protocol.
+TPF is response tokens per model forward; TPS is response tokens per second.
+See the [paper](https://arxiv.org/pdf/2607.14107) for the full evaluation
+protocol.
 
 ## Quickstart
 
@@ -138,43 +138,58 @@ print(result.text)
 
 </details>
 
-## LLaDA system presets
+## Performance benchmarking
 
-| Preset | Cache path |
-|---|---|
-| [llada8b-cuda-graphs.json](configs/llada8b-cuda-graphs.json) | Fixed-shape CUDA graphs for decode projections |
-| [llada8b-stream-overlap.json](configs/llada8b-stream-overlap.json) | CUDA stream overlap |
-| [llada8b-nvfp4.json](configs/llada8b-nvfp4.json) | Centroid-residual NVFP4 simulation |
-| [llada8b-nvfp4-overlap.json](configs/llada8b-nvfp4-overlap.json) | Quantization, pinned-CPU offload, and overlap |
-
-With the CUDA-graph preset, standalone LLaDA scored 13/16 on a 5-shot GSM8K
-check on one GB300, with 3.332 non-EOS tokens per forward and 57.90 non-EOS
-tokens/s. This small check uses different hardware from the paper's full
-A100 evaluation. The offload path retains a GPU hidden-state copy for sparse
-patching, so it does not provide the paper's GPU-memory reduction.
-
-## dInfer serving
-
-The optional [dInfer package](integrations/dinfer/README.md) runs
-Polestar-Cache and Polestar-Commit in a dInfer worker. Set
-`parallel_decoding="polestar", cache="polestar"`; the guide includes a complete
-serving example and a two-question GSM8K check. In a matched 16-question
-GB300 run, this path scored 12/16 and reached 383.42 warmed non-EOS tokens/s,
-versus 10/16 and 330.32 tokens/s for dInfer's threshold and prefix baseline.
-See the [measurement protocol](integrations/dinfer/README.md#measured-comparison).
-
-## Evaluation
-
-Install the text evaluation dependencies and run a benchmark:
+Install the benchmark dependencies. The second command adds dInfer for the
+side-by-side comparison:
 
 ```bash
 python -m pip install -e '.[eval]'
-python evaluation/run.py --config configs/llada8b.json --task gsm8k \
-  --output-path results/llada8b-gsm8k-256
+python -m pip install -e integrations/dinfer
 ```
 
-Add `--limit 16` for a short check, or `--limit 0.1` for 10% of the task.
-The text evaluation presets use 5-shot GSM8K, 4-shot MATH
+Run standalone Polestar on 16 GSM8K questions:
+
+```bash
+python evaluation/run.py --config configs/llada8b-cuda-graphs.json \
+  --task gsm8k --limit 16 --seed 42 \
+  --output-path results/polestar-gsm8k16
+```
+
+Compare dInfer with and without Polestar on the same questions:
+
+```bash
+python integrations/dinfer/benchmarks/evaluate_gsm8k.py \
+  --backend dinfer --config configs/llada8b.json --task gsm8k \
+  --limit 16 --seed 42 --prewarm-request \
+  --output-path results/dinfer-baseline-gsm8k16
+
+python integrations/dinfer/benchmarks/evaluate_gsm8k.py \
+  --backend polestar --config configs/llada8b.json --task gsm8k \
+  --limit 16 --seed 42 --prewarm-request \
+  --output-path results/dinfer-polestar-gsm8k16
+```
+
+`--prewarm-request` runs each prompt once before timing it. Use new output
+paths for each run; the evaluator refuses to overwrite existing results.
+Accuracy is in `results.json`. The standalone command prints tokens per
+second, and the dInfer commands also save timing in `serving_metrics.json`.
+For a quick check, change `--limit 16` to `--limit 2`.
+
+On one GB300, standalone Polestar scored 13/16 and reached 57.90 tokens per
+second. dInfer with Polestar scored 12/16 and reached 383.42 tokens per second,
+compared with 10/16 and 330.32 tokens per second for dInfer alone. The dInfer
+rates exclude the first measured request. These small checks use different
+hardware from the paper's full A100 evaluation. See the
+[recorded dInfer results](assets/data/dinfer-gsm8k16-gb300.json) and the
+[dInfer integration guide](integrations/dinfer/README.md) for the serving API.
+
+## Evaluation
+
+Use the standalone benchmark command above without `--limit` for a full run,
+or set `--limit 0.1` for 10% of the task. Change `--config` to evaluate LLaDA-1.5
+or Dream.
+The text benchmarks use 5-shot GSM8K, 4-shot MATH
 (`minerva_math`), 0-shot HumanEval, and 3-shot MBPP. Use
 `--allow-code-execution` when scoring generated programs with the benchmark's
 tests. The runner writes `results.json` and `samples_<task>.jsonl` to the
