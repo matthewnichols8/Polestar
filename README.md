@@ -27,6 +27,7 @@ https://github.com/user-attachments/assets/5fc2c4c0-0985-4036-b8fd-8819079f94bd
 ## News
 
 - **October 2026:** [Project website](https://polestar-dllm.github.io/) launched with interactive demos and benchmark results.
+- **October 2026:** System implementation and [dInfer integration](integrations/dinfer/README.md) released.
 - **October 2026:** Algorithm code released for LLaDA, Dream, and LLaDA-V.
 - **September 2026:** Polestar accepted at **NeurIPS 2026**.
 
