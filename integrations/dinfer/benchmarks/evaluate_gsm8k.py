@@ -22,7 +22,13 @@ RELEASE_ROOT = Path(__file__).resolve().parents[3]
 from dinfer.decoding.serving import DiffusionLLMServing, SamplingParams
 
 
-def install_dinfer_decoder(*, backend: str = "polestar", prewarm_request: bool = False):
+def install_dinfer_decoder(
+    *,
+    backend: str = "polestar",
+    prewarm_request: bool = False,
+    refresh_after_tokens: int = 3,
+    refresh_layer_count: int | None = None,
+):
     """Route the existing evaluator's model call through dInfer."""
     if backend not in {"dinfer", "polestar"}:
         raise ValueError(f"unknown dInfer benchmark backend: {backend}")
@@ -67,6 +73,8 @@ def install_dinfer_decoder(*, backend: str = "polestar", prewarm_request: bool =
             polestar_steps=steps,
             polestar_seed=seed,
             polestar_profile_timing=True,
+            polestar_refresh_after_tokens=refresh_after_tokens,
+            polestar_refresh_layer_count=refresh_layer_count,
             eos_id=126081,
         )
         start = time.perf_counter()
@@ -122,9 +130,22 @@ if __name__ == "__main__":
         index = sys.argv.index("--backend")
         backend = sys.argv[index + 1]
         del sys.argv[index:index + 2]
+    refresh_after_tokens = 3
+    if "--polestar-refresh-after-tokens" in sys.argv:
+        index = sys.argv.index("--polestar-refresh-after-tokens")
+        refresh_after_tokens = int(sys.argv[index + 1])
+        del sys.argv[index:index + 2]
+    refresh_layer_count = None
+    if "--polestar-refresh-layers" in sys.argv:
+        index = sys.argv.index("--polestar-refresh-layers")
+        refresh_layer_count = int(sys.argv[index + 1])
+        del sys.argv[index:index + 2]
     output_dir = Path(sys.argv[sys.argv.index("--output-path") + 1])
     generate_fn, service, request_timings, warmup_matches = install_dinfer_decoder(
-        backend=backend, prewarm_request=prewarm_request,
+        backend=backend,
+        prewarm_request=prewarm_request,
+        refresh_after_tokens=refresh_after_tokens,
+        refresh_layer_count=refresh_layer_count,
     )
     print(f"dInfer LLaDA GPU: {torch.cuda.get_device_name(0)}", flush=True)
     # The worker owns the model. The evaluator only needs the model
@@ -143,6 +164,12 @@ if __name__ == "__main__":
                 "model_compile": True,
                 "torch_compile_mode": "reduce-overhead",
                 "prewarm_each_request": prewarm_request,
+                "polestar_refresh_after_tokens": (
+                    refresh_after_tokens if backend == "polestar" else None
+                ),
+                "polestar_refresh_layer_count": (
+                    refresh_layer_count if backend == "polestar" else None
+                ),
             },
         )
     finally:
@@ -158,6 +185,12 @@ if __name__ == "__main__":
         metrics = {
             "backend": backend,
             "prewarm_each_request": prewarm_request,
+            "polestar_refresh_after_tokens": (
+                refresh_after_tokens if backend == "polestar" else None
+            ),
+            "polestar_refresh_layer_count": (
+                refresh_layer_count if backend == "polestar" else None
+            ),
             "request_tps": total_tokens / total_seconds,
             "worker_decode_tps": total_tokens / decode_seconds,
             "worker_capacity_positions_per_second": total_positions / decode_seconds,

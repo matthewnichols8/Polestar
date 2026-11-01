@@ -1556,7 +1556,7 @@ class LLaDAModel(nn.Module):
         use_cache: bool = False,
         last_logits_only: bool = False,
         output_hidden_states: Optional[bool] = None,
-        output_polestar_states: bool = False,
+        output_polestar_states: bool | str = False,
         replace_position: Optional[torch.Tensor] = None,
     ) -> LLaDAOutput:
         """
@@ -1595,6 +1595,10 @@ class LLaDAModel(nn.Module):
         # assert (past_key_values is None and not use_cache), "The kvcache is not suppotred for MDM."
 
         output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        if output_polestar_states is True:
+            output_polestar_states = "all"
+        if output_polestar_states not in (False, "all", "final"):
+            raise ValueError("output_polestar_states must be False, 'all', or 'final'")
         if output_polestar_states and self.config.block_group_size != 1:
             raise ValueError("Polestar state capture requires ungrouped layers")
 
@@ -1697,8 +1701,10 @@ class LLaDAModel(nn.Module):
         # Apply blocks one-by-one.
         if self.config.block_group_size == 1:
             for block_idx, block in enumerate(self.transformer.blocks):
-                if output_hidden_states or (
-                    output_polestar_states and block_idx >= self.config.n_layers - 2
+                if (
+                    output_hidden_states
+                    or output_polestar_states == "all"
+                    or (output_polestar_states == "final" and block_idx == self.config.n_layers - 1)
                 ):
                     # add hidden states
                     all_hidden_states.append(x)
@@ -1839,7 +1845,7 @@ class LLaDAModelLM(PreTrainedModel):
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        output_polestar_states: bool = False,
+        output_polestar_states: bool | str = False,
         return_dict: Optional[bool] = None,
         replace_position: Optional[torch.Tensor] = None,  # This is a hack mitigation of an issue in transformers `4.39.x`
     ) -> Union[Tuple, CausalLMOutputWithPast]:

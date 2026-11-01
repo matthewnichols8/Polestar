@@ -31,16 +31,17 @@ def test_invalid_limit(value):
 
 
 @pytest.mark.parametrize(
-    "model_type, task, token_available",
+    "model_type, task, token_available, external_decoder",
     [
-        ("llada", "gsm8k", False),
-        ("dream", "gsm8k", False),
-        ("llada_v", "mathvista_testmini", False),
-        ("llada_v", "mathvista_testmini", True),
-        ("llada_v", "mathverse_testmini_vision", False),
+        ("llada", "gsm8k", False, False),
+        ("llada", "gsm8k", False, True),
+        ("dream", "gsm8k", False, False),
+        ("llada_v", "mathvista_testmini", False, False),
+        ("llada_v", "mathvista_testmini", True, False),
+        ("llada_v", "mathverse_testmini_vision", False, False),
     ],
 )
-def test_prediction_mode_routes_to_harness_and_exports_samples(monkeypatch, tmp_path, model_type, task, token_available):
+def test_prediction_mode_routes_to_harness_and_exports_samples(monkeypatch, tmp_path, model_type, task, token_available, external_decoder):
     calls = []
 
     def evaluate(**kwargs):
@@ -70,7 +71,7 @@ def test_prediction_mode_routes_to_harness_and_exports_samples(monkeypatch, tmp_
         sys, "argv",
         ["run.py", "--config", str(preset), "--task", task, "--limit", "0.1", "--predict-only", "--seed", "17", "--output-path", str(output)],
     )
-    runner.main()
+    runner.main(llada_generate_fn=(lambda *args, **kwargs: None) if external_decoder else None)
 
     assert len(calls) == 1
     assert calls[0]["predict_only"] is True
@@ -80,6 +81,9 @@ def test_prediction_mode_routes_to_harness_and_exports_samples(monkeypatch, tmp_
     if model_type == "dream":
         assert calls[0]["model"]["enable_cuda_graphs"] is True
         assert calls[0]["model"]["enable_fused_rope"] is True
+    if model_type == "llada":
+        for option in ("enable_cuda_graphs", "enable_quantization", "enable_overlap"):
+            assert calls[0]["model"][option] is (not external_decoder)
     if model_type == "llada_v":
         assert calls[0]["cli_args"].output_path == str(output)
         assert "batch_size=" not in calls[0]["model_args"]
@@ -88,6 +92,8 @@ def test_prediction_mode_routes_to_harness_and_exports_samples(monkeypatch, tmp_
         expected_task = {"task": task, "dataset_kwargs": {"token": False}} if task == "mathvista_testmini" and not token_available else task
         assert calls[0]["tasks"] == [expected_task]
     metadata = json.loads((output / "results.json").read_text())["polestar"]
+    if model_type == "llada":
+        assert metadata["generation"]["enable_quantization"] is (not external_decoder)
     assert metadata["predict_only"] is True
     assert metadata["limit"] == 0.1
     assert metadata["seed"] == 17

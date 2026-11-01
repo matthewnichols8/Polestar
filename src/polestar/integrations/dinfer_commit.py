@@ -10,7 +10,7 @@ from dinfer.decoding.parallel_strategy import ParallelDecoder, broadcast_if_need
 from dinfer.decoding.utils import BlockIteratorFactory, KVCacheFactory
 from polestar.models.llada.system_cache import compute_token_drift_kl
 
-from .dinfer_cache import PolestarPrefixCache
+from .dinfer_cache import PolestarCache
 
 
 @torch.compile(dynamic=True)
@@ -50,6 +50,27 @@ def _select_commits(
     return torch.where(masked, prediction, tokens), high_confidence
 
 
+@torch.compile(dynamic=True)
+def _select_suffix_commits(
+    logits: torch.Tensor,
+    tokens: torch.Tensor,
+    eligible: torch.Tensor,
+    *,
+    mask_id: int,
+    threshold: float,
+):
+    prediction = logits.argmax(dim=-1)
+    confidence = F.softmax(logits.float(), dim=-1).gather(
+        -1, prediction.unsqueeze(-1)
+    ).squeeze(-1)
+    transfer = (
+        eligible.unsqueeze(0)
+        & (tokens == mask_id)
+        & (confidence >= threshold)
+    )
+    return torch.where(transfer, prediction, tokens), transfer
+
+
 class PolestarDriftDecoder(ParallelDecoder):
     """Use final-layer attention KL to commit eligible masked positions."""
 
@@ -67,6 +88,9 @@ class PolestarDriftDecoder(ParallelDecoder):
         self.nominal_block_length = None
         self.first_block_start = None
         self.block_start = None
+        self.cache = None
+        self.suffix_eligible = None
+        self.suffix_logits = None
 
     def block_init(self, block_x, block_id):
         self.block_length = block_x.shape[1]
@@ -74,6 +98,8 @@ class PolestarDriftDecoder(ParallelDecoder):
         self.current_attention = None
         self.previous_attention = None
         self.drift_window.clear()
+        self.suffix_eligible = None
+        self.suffix_logits = None
 
     def decode(self, logits, block_start, block_end, x, iter_threshold=None):
         attention = self.current_attention
@@ -107,13 +133,28 @@ class PolestarDriftDecoder(ParallelDecoder):
             allow_drift=allow_drift,
         )
         x[:, block_start:block_end] = torch.where(transfer, predicted, tokens)
+        committed = transfer.sum()
+        if self.suffix_eligible is not None:
+            suffix_end = block_end + self.suffix_eligible.numel()
+            suffix_tokens = x[:, block_end:suffix_end]
+            suffix_next, suffix_transfer = _select_suffix_commits(
+                self.suffix_logits,
+                suffix_tokens,
+                self.suffix_eligible,
+                mask_id=self.mask_id,
+                threshold=self.threshold,
+            )
+            x[:, block_end:suffix_end] = suffix_next
+            committed = committed + suffix_transfer.sum()
+        if self.cache is not None:
+            self.cache.record_commits(int(committed.item()))
         broadcast_if_needed(x.data)
 
 
 class _AttentionBridge:
     """Reconstruct current-block attention from explicit compiled-model outputs."""
 
-    def __init__(self, model, decoder: PolestarDriftDecoder, cache: PolestarPrefixCache):
+    def __init__(self, model, decoder: PolestarDriftDecoder, cache: PolestarCache):
         self.model = model
         self.decoder = decoder
         self.cache = cache
@@ -124,7 +165,7 @@ class _AttentionBridge:
 
     def __call__(self, *args, **kwargs):
         is_prefill = kwargs.get("past_key_values") is None
-        kwargs["output_polestar_states"] = True
+        kwargs["output_polestar_states"] = "all" if is_prefill else "final"
         torch.compiler.cudagraph_mark_step_begin()
         output = self.model(*args, **kwargs)
         start = self.decoder.block_start if is_prefill else 0
@@ -153,17 +194,21 @@ class _AttentionBridge:
             self.cache.begin_block(
                 output,
                 (self.decoder.block_start, self.decoder.block_start + self.decoder.block_length),
-                hidden_by_layer={
-                    self.cache.source_layer: output.hidden_states[-2],
-                    self.cache.target_layer: output.hidden_states[-1],
-                },
             )
         else:
             self.cache.after_dense_step(output, kwargs["past_key_values"])
+        self.decoder.suffix_eligible = self.cache.suffix_eligible
+        self.decoder.suffix_logits = (
+            output.logits[
+                :, self.decoder.block_length:
+                self.decoder.block_length + self.cache.suffix_eligible.numel(),
+            ]
+            if self.cache.suffix_eligible is not None else None
+        )
         return output
 
 
-class PolestarPrefixDiffusionLLM(BlockWiseDiffusionLLM):
+class PolestarDiffusionLLM(BlockWiseDiffusionLLM):
     request_seed: int = 42
     max_steps: int | None = None
 
@@ -177,8 +222,16 @@ class PolestarPrefixDiffusionLLM(BlockWiseDiffusionLLM):
         self.decoder.first_block_start = first_unmasked // block_length * block_length
         self.decoder.nominal_block_length = block_length
         self.model.cache.refresh_count = 0
-        self.model.cache.effective_patched_rows = 0
-        return super().generate(prompt, gen_length=gen_length, block_length=block_length)
+        rows = self.model.cache.effective_patched_rows
+        if isinstance(rows, torch.Tensor):
+            with torch.inference_mode():
+                rows.zero_()
+        else:
+            self.model.cache.effective_patched_rows = 0
+        try:
+            return super().generate(prompt, gen_length=gen_length, block_length=block_length)
+        finally:
+            self.model.cache.finish_request()
 
 
 def make_polestar_drift_generator(
@@ -188,7 +241,8 @@ def make_polestar_drift_generator(
     lower_bound: float,
     mask_id: int,
     eos_id: int,
-    cache_interval: int = 8,
+    refresh_after_tokens: int = 3,
+    refresh_layer_count: int | None = None,
     request_seed: int = 42,
     steps: int | None = None,
 ):
@@ -196,12 +250,18 @@ def make_polestar_drift_generator(
     decoder = PolestarDriftDecoder(
         threshold=threshold, lower_bound=lower_bound, mask_id=mask_id, eos_id=eos_id
     )
-    cache = PolestarPrefixCache(model, refresh_interval=cache_interval)
-    generator = PolestarPrefixDiffusionLLM(
+    cache = PolestarCache(
+        model,
+        refresh_after_tokens=refresh_after_tokens,
+        refresh_layer_count=refresh_layer_count,
+    )
+    decoder.cache = cache
+    generator = PolestarDiffusionLLM(
         _AttentionBridge(model, decoder, cache),
         decoder,
         BlockIteratorFactory(start_block_align=True),
         cache_factory=KVCacheFactory("prefix"),
+        maximum_unroll=1,
         early_stop=True,
     )
     generator.request_seed = request_seed

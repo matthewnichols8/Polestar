@@ -328,7 +328,7 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
         num_of_mask = (x[:, current_block_start:current_block_end] == mask_id).sum().item()
         if num_of_mask == 0:
             continue
-        if num_block % 4 == 3:
+        if num_block % 2 == 1:
 
             block_prefix_window = max(0, current_block_start - 2*block_length)
             block_suffix_window = min(prompt.shape[1] + gen_length, current_block_end + block_length)
@@ -388,8 +388,8 @@ def generate_with_dual_cache(model, prompt, steps=128, gen_length=128, block_len
         x_block = x[:, current_block_start:current_block_end]
         nfe += 1
         block_nfe += 1
-        block_block0_true += int(num_block % 4 != 3)
-        block_efficient_true += int(num_block % 4 == 3)
+        block_block0_true += int(num_block % 2 != 1)
+        block_efficient_true += int(num_block % 2 == 1)
 
         mask_index = (x == mask_id)
         mask_index[:, current_block_end:] = 0

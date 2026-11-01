@@ -25,6 +25,8 @@ def test_dinfer_polestar_selects_cache_and_commit(monkeypatch):
     params = SamplingParams(
         parallel_decoding="polestar", cache="polestar", mask_id=126336,
         eos_id=126081, use_bd=False, polestar_seed=13,
+        polestar_refresh_after_tokens=24,
+        polestar_refresh_layer_count=19,
     )
     assert init_generator(model, params) is result
     assert calls == [(model, {
@@ -32,7 +34,8 @@ def test_dinfer_polestar_selects_cache_and_commit(monkeypatch):
         "lower_bound": params.current_commit_lower_bound,
         "mask_id": 126336,
         "eos_id": 126081,
-        "cache_interval": 8,
+        "refresh_after_tokens": 24,
+        "refresh_layer_count": 19,
         "request_seed": 13,
         "steps": None,
     })]

@@ -851,10 +851,13 @@ class DreamDecoderLayer(nn.Module):
 
             key_present = key_present.view(B, -1, n_hkv, hd).transpose(1, 2)
             value_present = value_present.view(B, -1, n_hkv, hd).transpose(1, 2)
-            key_mean = key_present.mean(dim=1)
-            cluster_q_flat = cluster_q.mean(dim=1)
-
-            attn_scores = torch.matmul(cluster_q_flat, key_mean.transpose(-2, -1)) / math.sqrt(hd)
+            key_for_proxy = (
+                key_present.repeat_interleave(n_h // n_hkv, dim=1)
+                if n_h != n_hkv else key_present
+            )
+            attn_scores = torch.matmul(
+                cluster_q, key_for_proxy.transpose(-2, -1)
+            ) / math.sqrt(hd)
             attn_scores = torch.softmax(attn_scores, dim=-1)
 
             use_prev = (
@@ -878,7 +881,7 @@ class DreamDecoderLayer(nn.Module):
                 log_delta = log_curr - log_prev
                 kl_drift = (curr_dist_32 * log_delta).sum(dim=-1)
                 kl_drift = torch.clamp(kl_drift, min=0.0)
-                scores0 = kl_drift[0]
+                scores0 = kl_drift.mean(dim=1)[0]
             else:
                 scores0 = None
             self._prev_attn_scores = attn_scores.detach()

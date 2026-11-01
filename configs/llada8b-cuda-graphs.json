@@ -8,6 +8,8 @@
     "temperature": 0.0,
     "threshold": 0.9,
     "threshold_early": 0.7,
-    "enable_cuda_graphs": true
+    "enable_cuda_graphs": true,
+    "enable_quantization": false,
+    "enable_overlap": false
   }
 }

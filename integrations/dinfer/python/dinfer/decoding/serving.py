@@ -132,6 +132,8 @@ class SamplingParams:
         polestar_steps=None,
         polestar_seed=42,
         polestar_profile_timing=False,
+        polestar_refresh_after_tokens=3,
+        polestar_refresh_layer_count=None,
     ):
         self.parallel_decoding = parallel_decoding
         self.cache = cache
@@ -147,6 +149,8 @@ class SamplingParams:
         self.polestar_steps = polestar_steps
         self.polestar_seed = polestar_seed
         self.polestar_profile_timing = polestar_profile_timing
+        self.polestar_refresh_after_tokens = polestar_refresh_after_tokens
+        self.polestar_refresh_layer_count = polestar_refresh_layer_count
 
 
 def init_generator(model, sample_params, backend="vllm", max_length=4096):
@@ -168,7 +172,8 @@ def init_generator(model, sample_params, backend="vllm", max_length=4096):
             lower_bound=sample_params.current_commit_lower_bound,
             mask_id=sample_params.mask_id,
             eos_id=sample_params.eos_id,
-            cache_interval=8,
+            refresh_after_tokens=sample_params.polestar_refresh_after_tokens,
+            refresh_layer_count=sample_params.polestar_refresh_layer_count,
             request_seed=sample_params.polestar_seed,
             steps=sample_params.polestar_steps,
         )

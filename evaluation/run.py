@@ -61,6 +61,7 @@ def main(*, llada_model_factory=None, llada_generate_fn=None, execution_metadata
     if args.max_new_tokens is not None:
         config.generation.update(max_new_tokens=args.max_new_tokens, steps=args.max_new_tokens)
         config.__post_init__()
+    runtime_settings = config.generation_settings(args.device)
     output = Path(args.output_path)
     if (output / "results.json").exists():
         parser.error("results.json already exists; choose a new output directory")
@@ -110,7 +111,14 @@ def main(*, llada_model_factory=None, llada_generate_fn=None, execution_metadata
             parser.error("this task executes generated code; pass --allow-code-execution")
         if task.get("code_execution"):
             os.environ["HF_ALLOW_CODE_EVAL"] = "1"
-        settings = config.generation
+        settings = runtime_settings
+        if llada_generate_fn is not None:
+            # An external decoder owns its model execution and acceleration.
+            settings.update(
+                enable_cuda_graphs=False,
+                enable_quantization=False,
+                enable_overlap=False,
+            )
         common = dict(
             batch_size=1,
             device=args.device,
@@ -128,10 +136,10 @@ def main(*, llada_model_factory=None, llada_generate_fn=None, execution_metadata
                 steps=settings.get("steps", 256),
                 block_length=settings.get("block_length", 32),
                 show_speed=True,
-                enable_quantization=settings.get("enable_quantization", False),
+                enable_quantization=settings["enable_quantization"],
                 quantization_precision=settings.get("quantization_precision", "fp4"),
-                enable_overlap=settings.get("enable_overlap", False),
-                enable_cuda_graphs=settings.get("enable_cuda_graphs", False),
+                enable_overlap=settings["enable_overlap"],
+                enable_cuda_graphs=settings["enable_cuda_graphs"],
                 model_factory=llada_model_factory,
                 generate_fn=llada_generate_fn,
                 **common,
@@ -144,8 +152,8 @@ def main(*, llada_model_factory=None, llada_generate_fn=None, execution_metadata
                 diffusion_steps=settings.get("steps", 256),
                 block_length=settings.get("block_length", 32),
                 temperature=settings.get("temperature", 0.0),
-                enable_cuda_graphs=settings.get("enable_cuda_graphs", False),
-                enable_fused_rope=settings.get("enable_fused_rope", False),
+                enable_cuda_graphs=settings["enable_cuda_graphs"],
+                enable_fused_rope=settings["enable_fused_rope"],
                 add_bos_token=True,
                 alg="confidence_threshold",
                 **common,
@@ -172,7 +180,7 @@ def main(*, llada_model_factory=None, llada_generate_fn=None, execution_metadata
     results["polestar"] = {
         "model_preset": args.config,
         "model_id": config.model_id,
-        "generation": config.generation,
+        "generation": runtime_settings,
         "seed": args.seed,
         "limit": args.limit,
         "predict_only": args.predict_only,

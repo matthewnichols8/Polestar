@@ -8,6 +8,7 @@
     "temperature": 0.0,
     "threshold": 0.9,
     "threshold_early": 0.7,
+    "enable_cuda_graphs": false,
     "enable_quantization": true,
     "quantization_precision": "fp4",
     "enable_overlap": false

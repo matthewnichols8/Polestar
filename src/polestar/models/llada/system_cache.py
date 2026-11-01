@@ -14,7 +14,7 @@ from .system_clustering import (
     quantize_residual_codes,
     quantize_residual_given_clusters,
 )
-from .triton_quant import decode_packed_residuals
+from .triton_quant import decode_packed_residuals, encode_packed_residuals, triton as quant_triton
 from ...cuda_graph import CapturedCall
 
 @dataclass
@@ -26,6 +26,13 @@ class QuantizedOffloadState:
     start: int
     precision: str
     group_size: int
+    ready_event: Optional[torch.cuda.Event] = None
+
+
+def _wait_for_offload(state: QuantizedOffloadState) -> None:
+    if state.ready_event is not None:
+        state.ready_event.synchronize()
+        state.ready_event = None
 
 
 def quantize_hidden_for_offload(
@@ -36,24 +43,38 @@ def quantize_hidden_for_offload(
     start: int,
     precision: str = "fp4",
     group_size: int = 16,
+    use_triton: bool = True,
 ) -> QuantizedOffloadState:
     """Offload packed centroid residuals and FP8 scales to pinned host memory."""
-    local_labels = labels[:, start:start + hidden.shape[1]]
-    if local_labels.shape[1] != hidden.shape[1]:
+    if labels.shape[1] < start + hidden.shape[1]:
         raise ValueError("cluster labels do not cover the hidden-state window")
-    reference = centroids.gather(
-        1, local_labels.clamp_min(0).unsqueeze(-1).expand_as(hidden)
-    )
-    codes, scales = quantize_residual_codes(
-        hidden.float() - reference.float(), precision=precision, group_size=group_size
-    )
-    q = pack_codes(codes)
+    if (
+        precision == "fp4"
+        and group_size == 16
+        and hidden.is_cuda
+        and quant_triton is not None
+        and use_triton
+    ):
+        q, scales = encode_packed_residuals(hidden, centroids, labels, start=start)
+    else:
+        local_labels = labels[:, start:start + hidden.shape[1]]
+        reference = centroids.gather(
+            1, local_labels.clamp_min(0).unsqueeze(-1).expand_as(hidden)
+        )
+        codes, scales = quantize_residual_codes(
+            hidden.float() - reference.float(), precision=precision, group_size=group_size
+        )
+        q = pack_codes(codes)
     q_cpu = torch.empty_like(q, device="cpu", pin_memory=hidden.is_cuda)
     # CPU advanced indexing does not support float8; keep its exact bit pattern.
     scale_payload = scales.view(torch.uint8) if precision == "fp4" else scales
     s_cpu = torch.empty_like(scale_payload, device="cpu", pin_memory=hidden.is_cuda)
-    q_cpu.copy_(q)
-    s_cpu.copy_(scale_payload)
+    q_cpu.copy_(q, non_blocking=hidden.is_cuda)
+    s_cpu.copy_(scale_payload, non_blocking=hidden.is_cuda)
+    ready_event = None
+    if hidden.is_cuda:
+        ready_event = torch.cuda.Event()
+        ready_event.record(torch.cuda.current_stream(hidden.device))
 
     return QuantizedOffloadState(
         q_cpu=q_cpu,
@@ -63,6 +84,7 @@ def quantize_hidden_for_offload(
         start=start,
         precision=precision,
         group_size=group_size,
+        ready_event=ready_event,
     )
 
 
@@ -75,10 +97,19 @@ def load_selected_hidden_from_offload(
     use_triton: bool = True,
 ) -> torch.Tensor:
     """Retrieve selected residuals and add their block-entry centroids."""
+    _wait_for_offload(state)
     idx_local = idx_global - state.start
     idx_cpu = idx_local.detach().to(device="cpu", dtype=torch.long)
-    q_sel_cpu = state.q_cpu[:, idx_cpu, :].contiguous()
-    s_sel_cpu = state.scales_cpu[:, idx_cpu, :].contiguous()
+    q_sel_cpu = torch.empty(
+        (state.q_cpu.size(0), idx_cpu.numel(), state.q_cpu.size(-1)),
+        dtype=state.q_cpu.dtype, device="cpu", pin_memory=state.q_cpu.is_pinned(),
+    )
+    s_sel_cpu = torch.empty(
+        (state.scales_cpu.size(0), idx_cpu.numel(), state.scales_cpu.size(-1)),
+        dtype=state.scales_cpu.dtype, device="cpu", pin_memory=state.scales_cpu.is_pinned(),
+    )
+    torch.index_select(state.q_cpu, 1, idx_cpu, out=q_sel_cpu)
+    torch.index_select(state.scales_cpu, 1, idx_cpu, out=s_sel_cpu)
 
     q_sel = q_sel_cpu.to(device=device, non_blocking=True)
     s_sel = s_sel_cpu.to(device=device, non_blocking=True)
@@ -97,10 +128,69 @@ def load_selected_hidden_from_offload(
     )
 
 
+def load_hidden_window_from_offload(
+    state: QuantizedOffloadState,
+    *,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    """Stage all layers' local hidden rows with one host-to-device transfer."""
+    _wait_for_offload(state)
+    packed = state.q_cpu.to(device=device, non_blocking=True)
+    scales = state.scales_cpu.to(device=device, non_blocking=True)
+    if state.precision == "fp4":
+        scales = scales.view(torch.float8_e4m3fn)
+    width = packed.size(1)
+    labels = state.labels[:, state.start:state.start + width].clamp_min(0)
+    reference = state.centroids.gather(
+        1, labels.unsqueeze(-1).expand(-1, -1, state.centroids.size(-1))
+    ).to(dtype)
+    return decode_packed_residuals(
+        packed, scales, reference,
+        precision=state.precision,
+        group_size=state.group_size,
+    )
+
+
+def store_hidden_window_to_offload(
+    state: QuantizedOffloadState, hidden: torch.Tensor
+) -> None:
+    """Encode a temporary GPU window and replace its pinned CPU contents."""
+    if (
+        state.precision == "fp4"
+        and state.group_size == 16
+        and hidden.is_cuda
+        and quant_triton is not None
+    ):
+        packed, scales = encode_packed_residuals(
+            hidden, state.centroids, state.labels, start=state.start
+        )
+    else:
+        labels = state.labels[:, state.start:state.start + hidden.size(1)].clamp_min(0)
+        reference = state.centroids.gather(
+            1, labels.unsqueeze(-1).expand_as(hidden)
+        )
+        codes, scales = quantize_residual_codes(
+            hidden.float() - reference.float(),
+            precision=state.precision,
+            group_size=state.group_size,
+        )
+        packed = pack_codes(codes)
+    state.q_cpu.copy_(packed, non_blocking=hidden.is_cuda)
+    state.scales_cpu.copy_(
+        scales.view(torch.uint8) if state.precision == "fp4" else scales,
+        non_blocking=hidden.is_cuda,
+    )
+    if hidden.is_cuda:
+        state.ready_event = torch.cuda.Event()
+        state.ready_event.record(torch.cuda.current_stream(hidden.device))
+
+
 def update_quantized_offload_state(
     state: QuantizedOffloadState, idx_global: torch.Tensor, hidden: torch.Tensor
 ) -> None:
     """Keep offloaded residuals coherent after a sparse hidden-state update."""
+    _wait_for_offload(state)
     labels = state.labels[:, idx_global]
     reference = state.centroids.gather(
         1, labels.unsqueeze(-1).expand(-1, -1, state.centroids.shape[-1])
@@ -118,7 +208,7 @@ def update_quantized_offload_state(
 def apply_state_patching(
     *,
     update_packet_prev: Tuple[torch.Tensor, torch.Tensor],
-    hidden_state_past: torch.Tensor,
+    hidden_state_past: Optional[torch.Tensor],
     clustered_hidden_state: Optional[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
     layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]],
     attn_norm: nn.Module,
@@ -129,15 +219,24 @@ def apply_state_patching(
     effective_n_kv_heads: int,
     prefetched_h_old_raw: Optional[torch.Tensor] = None,
     quant_offload_state: Optional[QuantizedOffloadState] = None,
+    cached_hidden_window: Optional[torch.Tensor] = None,
+    window_start: int = 0,
+    inplace_kv: bool = False,
+    inplace_centroids: bool = False,
+    mirror_layer_past: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
 ) -> Tuple[
-    torch.Tensor,
+    Optional[torch.Tensor],
     Optional[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
     Optional[Tuple[torch.Tensor, torch.Tensor]],
 ]:
     """Patch hidden-state/KV caches and update centroids for selected indices."""
-    idx_raw, h_new_raw = update_packet_prev  # idx: (S,), h_new: (B, S, D)
+    idx_raw, h_new_raw = update_packet_prev[:2]  # idx: (S,), h_new: (B, S, D)
+    selection = update_packet_prev[2] if len(update_packet_prev) == 3 else None
 
-    if clustered_hidden_state is not None:
+    if selection is not None:
+        idx = idx_raw
+        h_new = h_new_raw
+    elif clustered_hidden_state is not None:
         _, current_labels, _ = clustered_hidden_state
         active_mask = current_labels[0, idx_raw] != -1
         idx = idx_raw[active_mask]
@@ -146,19 +245,33 @@ def apply_state_patching(
         idx = idx_raw
         h_new = h_new_raw
 
-    idx = idx.to(hidden_state_past.device)
+    if hidden_state_past is None and quant_offload_state is None and cached_hidden_window is None:
+        raise ValueError("state patching requires cached or offloaded hidden states")
+    idx = idx.to(h_new.device)
 
     # 1) Patch hidden-state cache.
-    hidden_state_past = hidden_state_past.clone()
+    if hidden_state_past is not None:
+        hidden_state_past = hidden_state_past.clone()
     if prefetched_h_old_raw is not None:
-        if clustered_hidden_state is not None:
+        if clustered_hidden_state is not None and selection is None:
             h_old = prefetched_h_old_raw[:, active_mask, :].clone()
         else:
             h_old = prefetched_h_old_raw.clone()
-    else:
+    elif hidden_state_past is not None:
         h_old = hidden_state_past[:, idx, :].clone()
-    hidden_state_past[:, idx, :] = h_new
-    if quant_offload_state is not None and idx.numel():
+    elif cached_hidden_window is not None:
+        h_old = cached_hidden_window[:, idx - window_start, :].clone()
+    else:
+        h_old = load_selected_hidden_from_offload(
+            quant_offload_state, idx, device=h_new.device, dtype=h_new.dtype
+        )
+    if selection is not None:
+        h_new = torch.where(selection.view(1, -1, 1), h_new, h_old)
+    if hidden_state_past is not None:
+        hidden_state_past.index_copy_(1, idx, h_new)
+    if cached_hidden_window is not None:
+        cached_hidden_window.index_copy_(1, idx - window_start, h_new)
+    elif quant_offload_state is not None and idx.numel():
         update_quantized_offload_state(quant_offload_state, idx, h_new)
 
     # 2) Patch KV cache at updated positions.
@@ -166,7 +279,7 @@ def apply_state_patching(
         past_key, past_value = layer_past
         head_dim = d_model // n_heads
 
-        h_new_norm = attn_norm(h_new_raw)
+        h_new_norm = attn_norm(h_new if selection is not None else h_new_raw)
         k_new = k_proj(h_new_norm)
         v_new = v_proj(h_new_norm)
 
@@ -174,37 +287,54 @@ def apply_state_patching(
         k_new = k_new.view(bsz, ssz, effective_n_kv_heads, head_dim).transpose(1, 2)
         v_new = v_new.view(bsz, ssz, effective_n_kv_heads, head_dim).transpose(1, 2)
 
-        past_key = past_key.clone()
-        past_value = past_value.clone()
-        past_key[:, :, idx_raw, :] = k_new
-        past_value[:, :, idx_raw, :] = v_new
+        if not inplace_kv:
+            past_key = past_key.clone()
+            past_value = past_value.clone()
+        if selection is not None:
+            selected = selection.view(1, 1, -1, 1)
+            k_new = torch.where(selected, k_new, past_key[:, :, idx_raw, :])
+            v_new = torch.where(selected, v_new, past_value[:, :, idx_raw, :])
+        past_key.index_copy_(2, idx_raw, k_new)
+        past_value.index_copy_(2, idx_raw, v_new)
+        if mirror_layer_past is not None:
+            mirror_layer_past[0].index_copy_(2, idx_raw, k_new)
+            mirror_layer_past[1].index_copy_(2, idx_raw, v_new)
         layer_past = (past_key, past_value)
 
     # 3) Incrementally update centroids using old/new selected token states.
     if clustered_hidden_state is not None:
         centroids, labels, counts = clustered_hidden_state
-
-        b_c, k_clusters, _ = centroids.shape
-        assert b_c == h_old.shape[0], "Batch size mismatch between centroids and hidden states"
-
-        labels_sel = labels[:, idx]
-        valid_sel_mask = (labels_sel >= 0) & (labels_sel < k_clusters)
-        safe_labels_sel = labels_sel.clamp(min=0)
-        labels_sel_onehot = F.one_hot(safe_labels_sel, num_classes=k_clusters).to(dtype=centroids.dtype)
-        labels_sel_onehot = labels_sel_onehot * valid_sel_mask.unsqueeze(-1)
-
-        sum_old = torch.einsum("bsk,bsd->bkd", labels_sel_onehot, h_old.to(centroids.dtype))
-        sum_new = torch.einsum("bsk,bsd->bkd", labels_sel_onehot, h_new.to(centroids.dtype))
-        delta = sum_new - sum_old
-
-        eps = 1e-6
-        denom = counts + eps
-        valid_mask_c = counts > 0
-        centroids_update = centroids + delta / denom
-        centroids = torch.where(valid_mask_c, centroids_update, centroids)
+        updated_centroids = incremental_centroids(
+            centroids, labels[:, idx], counts, h_old, h_new
+        )
+        if inplace_centroids:
+            centroids.copy_(updated_centroids)
+        else:
+            centroids = updated_centroids
         clustered_hidden_state = (centroids, labels, counts)
 
     return hidden_state_past, clustered_hidden_state, layer_past
+
+
+def incremental_centroids(
+    centroids: torch.Tensor,
+    selected_labels: torch.Tensor,
+    counts: torch.Tensor,
+    old_hidden: torch.Tensor,
+    new_hidden: torch.Tensor,
+) -> torch.Tensor:
+    """Update each centroid from the selected tokens' representation changes."""
+    batch, n_clusters, _ = centroids.shape
+    if batch != old_hidden.shape[0]:
+        raise ValueError("batch size mismatch between centroids and hidden states")
+    valid = (selected_labels >= 0) & (selected_labels < n_clusters)
+    labels = selected_labels.clamp(min=0)
+    onehot = F.one_hot(labels, num_classes=n_clusters).to(centroids.dtype)
+    onehot = onehot * valid.unsqueeze(-1)
+    old_sum = torch.einsum("bsk,bsd->bkd", onehot, old_hidden.to(centroids.dtype))
+    new_sum = torch.einsum("bsk,bsd->bkd", onehot, new_hidden.to(centroids.dtype))
+    updated = centroids + (new_sum - old_sum) / (counts + 1e-6)
+    return torch.where(counts > 0, updated, centroids)
 
 
 def initialize_clustered_hidden_state(
@@ -397,9 +527,13 @@ def build_cluster_update_packet(
     n_heads: int,
     prev_attn_scores: Optional[torch.Tensor],
     quant_offload_state: Optional[QuantizedOffloadState] = None,
+    cached_hidden_window: Optional[torch.Tensor] = None,
+    window_start: int = 0,
     use_triton_dequant: bool = True,
     centroid_q_graph: Optional[CapturedCall] = None,
     candidate_mask: Optional[torch.Tensor] = None,
+    candidate_range: Optional[Tuple[int, int]] = None,
+    candidate_indices: Optional[torch.Tensor] = None,
 ) -> Tuple[Optional[Tuple[torch.Tensor, torch.Tensor]], torch.Tensor]:
     """Build per-layer update packet from clustered token importance scores."""
     centroids, labels, _ = clustered_hidden_state
@@ -436,7 +570,11 @@ def build_cluster_update_packet(
     attn_scores = F.softmax(attn_scores, dim=-1)
 
     scores0 = None
-    if prev_attn_scores is not None and hidden_state_past is not None:
+    if prev_attn_scores is not None and (
+        hidden_state_past is not None
+        or quant_offload_state is not None
+        or cached_hidden_window is not None
+    ):
         scores0 = compute_cluster_drift_kl(attn_scores, prev_attn_scores)[0]
 
     update_packet = None
@@ -461,13 +599,22 @@ def build_cluster_update_packet(
         top_clusters = torch.topk(scores0, k=m_top, dim=-1).indices
 
         top_mask = torch.zeros(k_clusters, device=labels_b0.device, dtype=torch.bool)
-        top_mask[top_clusters] = True
+        top_mask.scatter_(0, top_clusters, True)
 
         sel_mask = eligible & top_mask[labels_safe]
-        idx_global = sel_mask.nonzero(as_tuple=True)[0]
+        if candidate_range is None:
+            idx_global = sel_mask.nonzero(as_tuple=True)[0]
+        else:
+            idx_global = (
+                candidate_indices
+                if candidate_indices is not None
+                else torch.arange(*candidate_range, device=labels.device)
+            )
 
         if idx_global.numel() > 0:
-            if quant_offload_state is not None:
+            if cached_hidden_window is not None:
+                hidden_cache = cached_hidden_window[:, idx_global - window_start, :]
+            elif quant_offload_state is not None:
                 hidden_cache = load_selected_hidden_from_offload(
                     quant_offload_state,
                     idx_global,
@@ -512,6 +659,9 @@ def build_cluster_update_packet(
             h_sel = dropout(h_sel)
             h_sel = og_h_sel + h_sel
 
-            update_packet = (idx_global, h_sel)
+            update_packet = (
+                (idx_global, h_sel, sel_mask[idx_global])
+                if candidate_range is not None else (idx_global, h_sel)
+            )
 
     return update_packet, attn_scores.detach()

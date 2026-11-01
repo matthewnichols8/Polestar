@@ -102,6 +102,12 @@ Set `HF_HOME` to a directory with room for the checkpoint, or set `model_id`
 in the preset to a local checkpoint directory. Install a CUDA-enabled PyTorch
 build compatible with your GPU before installing Polestar.
 
+On CUDA, LLaDA uses CUDA graphs, NVFP4 cache offload, and stream overlap by
+default. Dream uses CUDA graphs and its fused rotary kernel. Set the relevant
+`enable_cuda_graphs`, `enable_quantization`, `enable_overlap`, or
+`enable_fused_rope` field to `false` in your config to disable it. GPU
+accelerations are off by default when running on CPU.
+
 ## Models and examples
 
 | Model | Input | Preset | Generate | Evaluate |
@@ -151,7 +157,7 @@ python -m pip install -e integrations/dinfer
 Run standalone Polestar on 16 GSM8K questions:
 
 ```bash
-python evaluation/run.py --config configs/llada8b-cuda-graphs.json \
+python evaluation/run.py --config configs/llada8b.json \
   --task gsm8k --limit 16 --seed 42 \
   --output-path results/polestar-gsm8k16
 ```
@@ -159,14 +165,10 @@ python evaluation/run.py --config configs/llada8b-cuda-graphs.json \
 For Dream, use the same evaluator with its CUDA graphs and fused rotary kernel:
 
 ```bash
-python evaluation/run.py --config configs/dream7b-cuda-graphs.json \
+python evaluation/run.py --config configs/dream7b.json \
   --task gsm8k --limit 16 --seed 42 \
   --output-path results/dream-gsm8k16
 ```
-
-On one GB300, this Dream configuration produced the same answers as
-`configs/dream7b.json` on all 16 questions and reached 33.55 versus
-28.50 tokens per second. See the [run settings and results](assets/data/dream-gsm8k16-gb300.json).
 
 Compare dInfer with and without Polestar on the same questions:
 
@@ -179,6 +181,8 @@ python integrations/dinfer/benchmarks/evaluate_gsm8k.py \
 python integrations/dinfer/benchmarks/evaluate_gsm8k.py \
   --backend polestar --config configs/llada8b.json --task gsm8k \
   --limit 16 --seed 42 --prewarm-request \
+  --polestar-refresh-after-tokens 24 \
+  --polestar-refresh-layers 19 \
   --output-path results/dinfer-polestar-gsm8k16
 ```
 
@@ -186,15 +190,13 @@ python integrations/dinfer/benchmarks/evaluate_gsm8k.py \
 paths for each run; the evaluator refuses to overwrite existing results.
 Accuracy is in `results.json`. The standalone command prints tokens per
 second, and the dInfer commands also save timing in `serving_metrics.json`.
+The Polestar flags refresh 19 of LLaDA's 31 interlayer cache links in
+parallel after more than 24 committed tokens. Omit them to use the
+paper-style sequential refresh of every link after more than three tokens.
 For a quick check, change `--limit 16` to `--limit 2`.
 
-On one GB300, standalone Polestar scored 13/16 and reached 57.90 tokens per
-second. dInfer with Polestar scored 12/16 and reached 383.42 tokens per second,
-compared with 10/16 and 330.32 tokens per second for dInfer alone. The dInfer
-rates exclude the first measured request. These small checks use different
-hardware from the paper's full A100 evaluation. See the
-[recorded dInfer results](assets/data/dinfer-gsm8k16-gb300.json) and the
-[dInfer integration guide](integrations/dinfer/README.md) for the serving API.
+See the [dInfer integration guide](integrations/dinfer/README.md) for the
+serving API.
 
 ## Evaluation
 

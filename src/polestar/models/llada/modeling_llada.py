@@ -1097,8 +1097,6 @@ class LLaDALlamaBlock(LLaDABlock):
         Optional[Tuple[torch.Tensor, torch.Tensor]],
         Optional[Tuple[torch.Tensor, torch.Tensor]],
     ]:
-        if layer_id == self.config.n_layers - 1:
-            topk = 1
         if block_range is None and replace_position is not None:
             block_pos = replace_position[0].nonzero(as_tuple=True)[0]
             block_range = (block_pos[0].item(), block_pos[-1].item() + 1)
@@ -1131,7 +1129,12 @@ class LLaDALlamaBlock(LLaDABlock):
         #    - KV cache
         #    - cluster centroids
         # ------------------------------------------------------------------
-        if update_packet_prev is not None and hidden_state_past is not None and cluster and use_cluster:
+        if (
+            update_packet_prev is not None
+            and (hidden_state_past is not None or (enable_quantization and self._quant_offload_state is not None))
+            and cluster
+            and use_cluster
+        ):
             hidden_state_past, clustered_hidden_state, layer_past = apply_state_patching(
                 update_packet_prev=update_packet_prev,
                 hidden_state_past=hidden_state_past,
@@ -1163,6 +1166,7 @@ class LLaDALlamaBlock(LLaDABlock):
             and replace_position is not None
         ):
             self.attn_weights = None
+            self._prev_attn_scores = None
             if enable_overlap and x.is_cuda:
                 if self._step0_stream is None:
                     self._step0_stream = torch.cuda.Stream(device=x.device)
@@ -1193,6 +1197,17 @@ class LLaDALlamaBlock(LLaDABlock):
                 step0_event = torch.cuda.Event()
                 step0_event.record(self._step0_stream)
                 step0_async_handle = (step0_event, clustered_state_tmp, offload_state_tmp)
+            elif enable_quantization:
+                clustered_hidden_state, self._quant_offload_state = initialize_clustered_hidden_state_with_offload(
+                    x=x,
+                    current_hidden_state=current_hidden_state,
+                    replace_position=replace_position,
+                    window_size=window_size,
+                    target_total=8,
+                    quantization_precision=quantization_precision,
+                    group_size=16,
+                    block_range=block_range,
+                )
             else:
                 clustered_hidden_state = initialize_clustered_hidden_state(
                     x=x,
@@ -1200,8 +1215,6 @@ class LLaDALlamaBlock(LLaDABlock):
                     replace_position=replace_position,
                     window_size=window_size,
                     target_total=8,
-                    enable_quantization=enable_quantization,
-                    quantization_precision=quantization_precision,
                     block_range=block_range,
                 )
 
@@ -1280,7 +1293,7 @@ class LLaDALlamaBlock(LLaDABlock):
             and use_cluster
             and clustered_hidden_for_proxy is not None
             and cache is not None
-            and (cluster or hidden_state_past is None)
+            and (cluster or (hidden_state_past is None and quant_offload_for_proxy is None))
             and rope_k is not None
             and x.is_cuda
             and enable_overlap
@@ -1372,7 +1385,7 @@ class LLaDALlamaBlock(LLaDABlock):
                 and use_cluster
                 and clustered_hidden_state is not None
                 and cache is not None
-                and (cluster or hidden_state_past is None)
+                and (cluster or (hidden_state_past is None and self._quant_offload_state is None))
                 and rope_k is not None
             ):
                 prev_attn_scores = getattr(self, "_prev_attn_scores", None)
@@ -1407,6 +1420,8 @@ class LLaDALlamaBlock(LLaDABlock):
         # - model output carries cache and hidden-state bookkeeping
         if use_cache:
             if not use_cluster:
+                hidden_state_past_new = None
+            elif enable_quantization:
                 hidden_state_past_new = None
             elif hidden_state_past is not None:
                 hidden_state_past_new = hidden_state_past

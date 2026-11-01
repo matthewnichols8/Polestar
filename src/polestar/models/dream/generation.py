@@ -595,7 +595,7 @@ class DreamGenerationMixin:
                 if block_mask_index.sum().item() == 0:
                     continue
 
-                if supports_efficient_window and num_block % 4 == 3 and past_key_values is not None:
+                if supports_efficient_window and num_block % 2 == 1 and past_key_values is not None:
                     block_prefix_window = max(0, current_block_start - 2 * block_length)
                     block_suffix_window = min(x.shape[1], current_block_end + block_length)
                     x_window = x[:, block_prefix_window:block_suffix_window]

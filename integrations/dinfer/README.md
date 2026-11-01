@@ -2,9 +2,9 @@
 
 This optional package runs Polestar-Cache and Polestar-Commit in a dInfer LLaDA
 worker. The accelerated dInfer path uses the same LLaDA checkpoint as
-standalone Polestar. Within dInfer's prefix decoder, a penultimate-layer
-proxy updates the final-layer KV cache for the next forward pass, while
-final-layer attention drift guides token commitment.
+standalone Polestar. Within dInfer's prefix decoder, each layer measures
+cluster drift and passes a sparse update packet to the next layer. Final-layer
+attention drift guides current-block and suffix-block token commitment.
 `parallel_decoding="polestar", cache="polestar"` selects both Cache and Commit.
 dInfer's threshold decoder with a prefix cache is available as a comparison
 baseline; it is not a Polestar path.
@@ -43,6 +43,8 @@ params = SamplingParams(
     mask_id=126336,
     eos_id=126081,
     polestar_seed=42,
+    polestar_refresh_after_tokens=24,
+    polestar_refresh_layer_count=19,
 )
 server = DiffusionLLMServing(
     model_id,
@@ -62,13 +64,28 @@ finally:
 
 The adapter uses one GPU per worker and compiles the dInfer model on first use.
 The first request includes compilation; a new prompt length may compile an
-additional graph.
+additional model graph. The first Cache refresh for a given sequence and window
+shape captures its layer-wise update; later refreshes with that shape reuse the
+graph. The worker retains up to four Cache graph shapes across requests. The
+model-output KV buffer and packed-KV workspace are each shared across those
+shapes and grow when a longer sequence requires more space.
+
 `polestar_seed` defaults to 42 and seeds cache clustering for each request.
-The dInfer path requires greedy decoding (`temperature=0`) and currently uses
-two upper layers for selective Cache refresh every eight decode forwards. Its
-prefix KV patches take effect on the next model forward. The standalone
-Polestar interface retains the paper's full-layer cache path; see the
-[standalone benchmark](../../README.md#performance-benchmarking).
+The dInfer path requires greedy decoding (`temperature=0`). By default,
+Cache passes sparse updates through every model layer after more than three
+committed tokens. The settings above refresh 19 of LLaDA's 31 interlayer
+cache links after more than 24 committed tokens. Those links are scored
+from the same cache state and patched in parallel. Both settings apply
+Polestar-Cache and Polestar-Commit; the smaller, parallel refresh changes
+the paper's layer-by-layer update order.
+
+The hidden states for the local window are quantized in pinned CPU memory
+and staged on GPU during each refresh. Prefix KV patches take effect on
+the next model forward. The final layer's four highest-drift clusters select
+suffix positions; selected positions are committed when their confidence
+from the already-computed dInfer logits reaches 0.9. KV patches in dInfer
+remain prefix-only. The standalone Polestar interface also caches a suffix
+window; see [performance benchmarking](../../README.md#performance-benchmarking).
 
 ## Check GSM8K
 
@@ -77,7 +94,9 @@ Run two questions first:
 ```bash
 python integrations/dinfer/benchmarks/evaluate_gsm8k.py \
   --backend polestar --config configs/llada8b.json --task gsm8k \
-  --limit 2 --seed 42 --output-path results/dinfer-polestar-smoke
+  --limit 2 --seed 42 --polestar-refresh-after-tokens 24 \
+  --polestar-refresh-layers 19 \
+  --output-path results/dinfer-polestar-smoke
 ```
 
 For a larger comparison, run `--limit 16` with a new output directory. The
@@ -95,22 +114,3 @@ python integrations/dinfer/benchmarks/evaluate_gsm8k.py \
 Both decoders compile their model on the first request. Add
 `--prewarm-request` to both commands to run each prompt once before timing
 it. The timing file also records whether the repeated answers match.
-
-## Measured comparison
-
-On one GB300, the two decoders ran sequentially with the same LLaDA-8B
-checkpoint, 16 GSM8K questions, 5-shot prompts, seed 42, generation length
-256, block length 32, confidence threshold 0.9, and one untimed pass for each
-question. Both repeated all 16 answers exactly.
-
-| Decoder | Accuracy | Tokens per second | Measured request time |
-| --- | ---: | ---: | ---: |
-| dInfer threshold + prefix cache | 10/16 | 330.32 | 11.39 s |
-| dInfer with Polestar Cache + Commit | 12/16 | 383.42 | 10.06 s |
-
-The Polestar path was 16.1% faster by tokens per second on this comparison.
-Those rates exclude the first measured request. Request time is the sum
-across all 16 measured requests, excluding each prompt's untimed pass.
-[Recorded metrics](../../assets/data/dinfer-gsm8k16-gb300.json) include the
-settings and exact values. This small check is separate from the paper's full
-GSM8K evaluation.

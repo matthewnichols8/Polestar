@@ -50,3 +50,21 @@ class PolestarConfig:
     def from_json(cls, path: str | Path) -> "PolestarConfig":
         with Path(path).open(encoding="utf-8") as handle:
             return cls(**json.load(handle))
+
+    def generation_settings(self, device: str = "cuda") -> dict[str, Any]:
+        """Resolve GPU accelerations while preserving explicit overrides."""
+        use_gpu = str(device).startswith("cuda")
+        if self.model_type == "llada":
+            defaults = {
+                "enable_cuda_graphs": use_gpu,
+                "enable_quantization": use_gpu,
+                "enable_overlap": use_gpu,
+            }
+        elif self.model_type == "dream":
+            defaults = {
+                "enable_cuda_graphs": use_gpu,
+                "enable_fused_rope": use_gpu,
+            }
+        else:
+            defaults = {}
+        return {**defaults, **self.generation}

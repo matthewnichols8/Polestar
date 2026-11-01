@@ -44,3 +44,19 @@ def test_dream_cuda_graphs_are_supported():
     config = PolestarConfig("dream", "checkpoint", {"enable_cuda_graphs": True, "enable_fused_rope": True})
     assert config.generation["enable_cuda_graphs"]
     assert config.generation["enable_fused_rope"]
+
+
+def test_gpu_accelerations_default_on_and_can_be_disabled():
+    llada = PolestarConfig("llada", "checkpoint")
+    assert all(llada.generation_settings("cuda")[name] for name in (
+        "enable_cuda_graphs", "enable_quantization", "enable_overlap"
+    ))
+    assert not any(llada.generation_settings("cpu")[name] for name in (
+        "enable_cuda_graphs", "enable_quantization", "enable_overlap"
+    ))
+    llada.generation["enable_overlap"] = False
+    assert llada.generation_settings("cuda")["enable_overlap"] is False
+
+    dream = PolestarConfig("dream", "checkpoint", {"enable_fused_rope": False})
+    assert dream.generation_settings("cuda")["enable_cuda_graphs"] is True
+    assert dream.generation_settings("cuda")["enable_fused_rope"] is False
