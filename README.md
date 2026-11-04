@@ -116,6 +116,7 @@ accelerations are off by default when running on CPU.
 | LLaDA-1.5 | Text | [llada15.json](configs/llada15.json) | [Text example](examples/generate.py) | [Text benchmarks](#evaluation) |
 | Dream-7B-Instruct | Text | [dream7b.json](configs/dream7b.json) | [Text example](examples/generate.py) | [Text benchmarks](#evaluation) |
 | LLaDA-V | Image + text | [llada-v.json](configs/llada-v.json) | [Image example](examples/image_generation.py) | [Image benchmarks](#evaluation) |
+| DiffusionGemma-26B-A4B-it | Text (dInfer only) | [diffusiongemma26b.json](integrations/dinfer/configs/diffusiongemma26b.json) | [dInfer API](integrations/dinfer/README.md#diffusiongemma) | [dInfer benchmark](integrations/dinfer/README.md#diffusiongemma) |
 
 Switch text models by replacing the `--config` path in the quickstart. For an image-conditioned response with LLaDA-V:
 
