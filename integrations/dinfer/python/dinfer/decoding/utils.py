@@ -411,6 +411,14 @@ class PerLayerKVCache:
             k, v = k[:, :, -keep:], v[:, :, -keep:]
         self.k[layer_idx], self.v[layer_idx] = k.contiguous(), v.contiguous()
 
+    def snapshot(self):
+        """A copy that shares this cache's tensors. `append` replaces tensors instead of writing into them, so
+        later appends to either copy leave the other unchanged; snapshots cost no memory until they diverge."""
+        other = PerLayerKVCache.__new__(PerLayerKVCache)
+        other.layer_types, other.sliding_window = self.layer_types, self.sliding_window
+        other.k, other.v, other.pos = list(self.k), list(self.v), dict(self.pos)
+        return other
+
     def append_positions(self, positions):
         """Record the absolute positions of the tokens just appended (call once per forward, after all layers)."""
         for lt in self.pos:

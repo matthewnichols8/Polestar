@@ -302,7 +302,10 @@ class CanvasDiffusionLLM(DiffusionLLM):
         passed to `model.denoise` as `layer_runner` and must provide `reset()` (called at every canvas),
         `begin_step(canvas)`, `run_layer(layer, h, cos, sin, cache, pos)`, `end_step()` and `stats()`.
 
-    Batch size 1. After `generate`, `last_stats` holds per-call statistics (steps per canvas, new tokens).
+    Batch size 1. After `generate`, `last_stats` holds per-call statistics (steps per canvas, new tokens), and
+    `last_prompt_cache` holds a snapshot of the prefix cache right after the prompt was encoded. Passing that
+    snapshot back as `prefix_cache` to a later call whose prompt extends this one encodes only the new tokens
+    (prefix reuse across turns of a conversation).
     """
     def __init__(self, model, decoder, iterator_factory, cache_factory, early_stop=True, canvas_cache=None):
         if iterator_factory._start_block_align or getattr(iterator_factory, '_use_bd', False):
@@ -318,6 +321,7 @@ class CanvasDiffusionLLM(DiffusionLLM):
         self.canvas_cache = canvas_cache
         self.diff_iteration.canvas_cache = canvas_cache
         self.last_stats = None
+        self.last_prompt_cache = None
 
     @property
     def num_forwards(self):
@@ -328,7 +332,7 @@ class CanvasDiffusionLLM(DiffusionLLM):
         return self.diff_iteration.cache_updates
 
     @ torch.no_grad()
-    def generate(self, prompt, gen_length=256, block_length=None):
+    def generate(self, prompt, gen_length=256, block_length=None, prefix_cache=None):
         ''' Generate tokens canvas by canvas.
 
         Parameters:
@@ -339,6 +343,10 @@ class CanvasDiffusionLLM(DiffusionLLM):
             Token budget; rounded up to whole canvases.
         block_length: int, optional
             Canvas length. Defaults to (and must equal) the model's trained canvas length (256 for DiffusionGemma).
+        prefix_cache: PerLayerKVCache, optional
+            A cache holding the first `prefix_cache.seq_length()` tokens of `prompt` (typically an earlier call's
+            `last_prompt_cache`); only the remaining prompt tokens are encoded. It is not modified. The caller is
+            responsible for the token match.
 
         Returns
         -------
@@ -353,11 +361,18 @@ class CanvasDiffusionLLM(DiffusionLLM):
         num_canvases = -(-gen_length // block_length)
 
         x = TokenArray(prompt, num_canvases * block_length, decoder.pad_id, decoder.eos_id[0], model.device)
-        kv_cache = self.cache_factory.create(model.config).get_key_values()
-        model.encode(prompt.to(model.device), kv_cache)
+        if prefix_cache is None:
+            kv_cache = self.cache_factory.create(model.config).get_key_values()
+        else:
+            kv_cache = prefix_cache.snapshot()
+        reused = kv_cache.seq_length()
+        assert reused <= prompt.shape[1], 'the prefix cache is longer than the prompt'
+        if reused < prompt.shape[1]:
+            model.encode(prompt[:, reused:].to(model.device), kv_cache)
+        self.last_prompt_cache = kv_cache.snapshot()
         self.diff_iteration.cache_updates += 1
         eos_ids = torch.tensor(decoder.eos_id, device=model.device)
-        stats = {'steps_per_canvas': [], 'finished': False}
+        stats = {'steps_per_canvas': [], 'finished': False, 'reused_prompt_tokens': reused}
         if self.canvas_cache is not None:
             stats['canvas_cache'] = []
         end = x.total_length

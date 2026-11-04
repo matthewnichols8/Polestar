@@ -109,3 +109,55 @@ def test_canvas_llm_requires_the_per_layer_prefix_cache(model):
     with pytest.raises(ValueError):
         CanvasDiffusionLLM(model, _decoder(), BlockIteratorFactory(start_block_align=True),
                            KVCacheFactory("prefix", per_layer=True))
+
+
+def _assert_same_cache(a, b, exact=True):
+    assert a.seq_length() == b.seq_length()
+    for i in range(TEXT_CONFIG["num_hidden_layers"]):
+        if exact:
+            assert torch.equal(a.k[i], b.k[i]) and torch.equal(a.v[i], b.v[i])
+        else:
+            torch.testing.assert_close(a.k[i], b.k[i], atol=1e-3, rtol=1e-3)
+            torch.testing.assert_close(a.v[i], b.v[i], atol=1e-3, rtol=1e-3)
+    for layer_type in set(TEXT_CONFIG["layer_types"]):
+        assert torch.equal(a.key_positions(layer_type), b.key_positions(layer_type))
+
+
+def test_snapshot_is_unaffected_by_later_appends(model):
+    cache = model.new_cache()
+    model.encode(_prompt(5), cache)
+    snap = cache.snapshot()
+    before = [k.clone() for k in snap.k]
+    model.encode(_prompt(7, seed=1), cache)
+    assert snap.seq_length() == 5 and cache.seq_length() == 12
+    assert all(torch.equal(a, b) for a, b in zip(before, snap.k))
+
+
+def test_prefix_cache_reuse_encodes_only_the_new_tokens(model):
+    from dinfer import BlockIteratorFactory, CanvasDiffusionLLM, KVCacheFactory
+
+    def llm():
+        return CanvasDiffusionLLM(model, _decoder(max_denoising_steps=2), BlockIteratorFactory(),
+                                  KVCacheFactory("prefix", per_layer=True))
+
+    # The second prompt extends the first past the sliding window, as a growing agent conversation does.
+    first = _prompt(7)
+    second = torch.cat([first, _prompt(TEXT_CONFIG["sliding_window"] + 3, seed=2)], dim=1)
+    reusing = llm()
+    reusing.generate(first, gen_length=2 * CANVAS_LENGTH)  # also encodes committed canvases after the prompt
+    snapshot = reusing.last_prompt_cache
+    assert snapshot.seq_length() == 7
+    reusing.generate(second, gen_length=CANVAS_LENGTH, prefix_cache=snapshot)
+    assert reusing.last_stats["reused_prompt_tokens"] == 7
+    assert snapshot.seq_length() == 7  # the caller's snapshot is not modified
+
+    # Reuse is bitwise identical to encoding the prompt in two pieces split where the old prompt ended ...
+    split = model.new_cache()
+    model.encode(first, split)
+    model.encode(second[:, first.shape[1]:], split)
+    _assert_same_cache(reusing.last_prompt_cache, split)
+    # ... and matches a one-pass encode up to float rounding (the random tiny model amplifies it to ~1e-4).
+    fresh = llm()
+    fresh.generate(second, gen_length=CANVAS_LENGTH)
+    assert fresh.last_stats["reused_prompt_tokens"] == 0
+    _assert_same_cache(reusing.last_prompt_cache, fresh.last_prompt_cache, exact=False)
