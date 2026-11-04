@@ -457,10 +457,11 @@ class DiffusionGemmaModelLM(Holder):
 
     def placement_summary(self):
         p = self.expert_placement
+        where = "GPU" if self.device.type == "cuda" else str(self.device)
         if self.expert_dtype == "int8":
-            return f"experts {self.e0}-{self.e1 - 1}: int8, all {len(p)} layers on GPU"
+            return f"experts {self.e0}-{self.e1 - 1}: int8, all {len(p)} layers on {where}"
         n_cpu = p.count("cpu")
-        return (f"experts {self.e0}-{self.e1 - 1}: bf16 weights, {len(p) - n_cpu} layers on GPU, "
+        return (f"experts {self.e0}-{self.e1 - 1}: bf16 weights, {len(p) - n_cpu} layers on {where}, "
                 f"{n_cpu} in pinned CPU memory" + (f" (layers {p.index('cpu')}-{len(p) - 1})" if n_cpu else ""))
 
     def _expected_tensors(self):
