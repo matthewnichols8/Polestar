@@ -17,5 +17,14 @@
 
 from .configuration_llada import LLaDAConfig
 from .modeling_llada import LLaDAModelLM
+from .configuration_diffusion_gemma import DiffusionGemmaConfig
+from .modeling_diffusion_gemma import DiffusionGemmaModelLM
+from .tokenization_diffusion_gemma import load_diffusion_gemma_tokenizer
 
-__all__ = ["LLaDAConfig", "LLaDAModelLM"]
+__all__ = [
+    "DiffusionGemmaConfig",
+    "DiffusionGemmaModelLM",
+    "LLaDAConfig",
+    "LLaDAModelLM",
+    "load_diffusion_gemma_tokenizer",
+]

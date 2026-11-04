@@ -245,3 +245,148 @@ class BlockWiseDiffusionLLM(DiffusionLLM):
                 break
         logger.info(f'The number of diffusion iterations: {self.num_forwards}')
         return x.get_generated_tokens()
+
+
+class CanvasDiffusionIteration(DiffusionIteration):
+    """ One denoising pass of uniform-noise canvas diffusion (DiffusionGemma).
+
+    The model denoises the whole canvas, reading (never writing) the prefix KV-cache and the decoder's
+    self-conditioning logits from the previous pass; the decoder then writes the next canvas into `x`.
+    """
+    def __init__(self):
+        super().__init__()
+        self.num_forwards = 0
+        self.cache_updates = 0
+        self.iter_no = 0
+
+    canvas_cache = None  # optional cross-step canvas cache, set by CanvasDiffusionLLM
+
+    def forward(self, model, decoder, x, kv_cache, block_loc, cur_step):
+        if self.canvas_cache is None:
+            logits = model.denoise(x[:, block_loc.start:block_loc.end], kv_cache, decoder.sc_logits)
+        else:
+            logits = model.denoise(x[:, block_loc.start:block_loc.end], kv_cache, decoder.sc_logits,
+                                   layer_runner=self.canvas_cache)
+        self.num_forwards += 1
+        self.iter_no += 1
+        return decoder.decode(logits, block_loc.start, block_loc.end, x, cur_step)
+
+
+class CanvasDiffusionLLM(DiffusionLLM):
+    """ Diffusion LLM inference for uniform-noise canvas diffusion models (DiffusionGemma).
+
+    Generation is block by block like BlockDiffusionLLM, but each block ("canvas") starts as uniformly random
+    tokens instead of mask tokens, and every position is re-predicted on every pass:
+
+      prefill: encode the prompt into the prefix cache
+      for each canvas (block) after the prompt:
+          decoder.init_block: fill the canvas with noise
+          for cur_step = max_denoising_steps .. 1: denoise + decoder.decode (until the decoder reports convergence)
+          commit the decoder's argmax canvas
+          if it contains EOS (and early_stop): stop; otherwise encode the committed canvas into the prefix cache
+
+    Parameters
+    ----------
+    model : DiffusionGemmaModelLM
+        Provides `encode(ids, cache)` and `denoise(canvas, cache, self_conditioning_logits)`.
+    decoder : EntropyBoundParallelDecoder
+        Decides which positions to keep on each pass; provides the argmax canvas and self-conditioning logits.
+    iterator_factory : BlockIteratorFactory
+        Must iterate blocks right after the prompt (start_block_align=False, use_block_diffusion=False).
+    cache_factory : KVCacheFactory
+        Must create a per-layer prefix cache (KVCacheFactory('prefix', per_layer=True)).
+    early_stop : bool, default=True
+        Stop after the canvas that contains the first EOS token.
+    canvas_cache : optional
+        A cross-step canvas cache (e.g. polestar.integrations.dinfer_canvas_cache.CanvasPolestarCache). It is
+        passed to `model.denoise` as `layer_runner` and must provide `reset()` (called at every canvas),
+        `begin_step(canvas)`, `run_layer(layer, h, cos, sin, cache, pos)`, `end_step()` and `stats()`.
+
+    Batch size 1. After `generate`, `last_stats` holds per-call statistics (steps per canvas, new tokens).
+    """
+    def __init__(self, model, decoder, iterator_factory, cache_factory, early_stop=True, canvas_cache=None):
+        if iterator_factory._start_block_align or getattr(iterator_factory, '_use_bd', False):
+            raise ValueError('canvases must start right after the prompt: use BlockIteratorFactory()')
+        if not getattr(cache_factory, 'per_layer', False):
+            raise ValueError("use KVCacheFactory('prefix', per_layer=True)")
+        self.model = model
+        self.decoder = decoder
+        self.iterator_factory = iterator_factory
+        self.cache_factory = cache_factory
+        self.early_stop = early_stop
+        self.diff_iteration = CanvasDiffusionIteration()
+        self.canvas_cache = canvas_cache
+        self.diff_iteration.canvas_cache = canvas_cache
+        self.last_stats = None
+
+    @property
+    def num_forwards(self):
+        return self.diff_iteration.num_forwards
+
+    @property
+    def cache_updates(self):
+        return self.diff_iteration.cache_updates
+
+    @ torch.no_grad()
+    def generate(self, prompt, gen_length=256, block_length=None):
+        ''' Generate tokens canvas by canvas.
+
+        Parameters:
+        ----------
+        prompt: Torch.Tensor
+            A tensor of shape (1, L) that contains the input prompt.
+        gen_length: int
+            Token budget; rounded up to whole canvases.
+        block_length: int, optional
+            Canvas length. Defaults to (and must equal) the model's trained canvas length (256 for DiffusionGemma).
+
+        Returns
+        -------
+        Torch.Tensor: A tensor of shape (1, L') that contains the prompt tokens and the generated tokens.
+            EOS and any tokens after EOS have been removed.
+        '''
+        assert prompt.shape[0] == 1, 'batch size 1 only'
+        model, decoder = self.model, self.decoder
+        canvas_length = model.config.canvas_length
+        block_length = block_length or canvas_length
+        assert block_length == canvas_length, f'DiffusionGemma uses {canvas_length}-token canvases'
+        num_canvases = -(-gen_length // block_length)
+
+        x = TokenArray(prompt, num_canvases * block_length, decoder.pad_id, decoder.eos_id[0], model.device)
+        kv_cache = self.cache_factory.create(model.config).get_key_values()
+        model.encode(prompt.to(model.device), kv_cache)
+        self.diff_iteration.cache_updates += 1
+        eos_ids = torch.tensor(decoder.eos_id, device=model.device)
+        stats = {'steps_per_canvas': [], 'finished': False}
+        if self.canvas_cache is not None:
+            stats['canvas_cache'] = []
+        end = x.total_length
+
+        for block_id, (block_loc, block) in enumerate(self.iterator_factory.create(x, block_length)):
+            decoder.init_block(x, block_loc.start, block_loc.end)
+            if self.canvas_cache is not None:
+                self.canvas_cache.reset()
+            steps = 0
+            for cur_step in range(decoder.max_denoising_steps, 0, -1):
+                done = self.diff_iteration.forward(model, decoder, x, kv_cache, block_loc, cur_step)
+                steps += 1
+                if bool(done.all()):
+                    break
+            stats['steps_per_canvas'].append(steps)
+            if self.canvas_cache is not None:
+                stats['canvas_cache'].append(self.canvas_cache.stats())
+
+            committed = decoder.argmax
+            x[:, block_loc.start:block_loc.end] = committed
+            is_eos = torch.isin(committed, eos_ids)
+            if self.early_stop and bool(is_eos.any()):
+                end = block_loc.start + int(is_eos[0].int().argmax())
+                stats['finished'] = True
+                break
+            model.encode(committed, kv_cache)
+            self.diff_iteration.cache_updates += 1
+
+        stats['new_tokens'] = end - prompt.shape[1]
+        stats['num_forwards'] = sum(stats['steps_per_canvas'])
+        self.last_stats = stats
+        return x.data[:, :end]

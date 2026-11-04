@@ -371,16 +371,89 @@ class DiffusionKVCacheManager:
 
 
 
+class PerLayerKVCache:
+    """ Prefix KV-cache stored per layer, for models whose layers have different K/V shapes.
+
+    `KVCache` stacks all layers into one tensor, which requires identical shapes. DiffusionGemma mixes
+    sliding-window layers (8 KV heads x 256) and full-attention layers (2 KV heads x 512), so each layer keeps
+    its own [B, H_kv, S, D] tensors here. Layers whose type is 'sliding_attention' keep only the last
+    `sliding_window - 1` tokens (as HF's DynamicSlidingWindowLayer); other layers keep everything.
+    Absolute key positions are tracked per layer type for building causal/sliding masks.
+    """
+    def __init__(self, num_layers, layer_types, sliding_window=None):
+        self.layer_types = list(layer_types)
+        self.sliding_window = sliding_window
+        self.k = [None] * num_layers
+        self.v = [None] * num_layers
+        self.pos = {lt: None for lt in set(self.layer_types)}
+
+    def _keep(self, layer_type):
+        return self.sliding_window - 1 if layer_type == 'sliding_attention' and self.sliding_window else None
+
+    def seq_length(self):
+        """Number of tokens written so far (positions are contiguous from 0)."""
+        p = next(iter(self.pos.values()))
+        return 0 if p is None else int(p[-1].item()) + 1
+
+    def get(self, layer_idx):
+        return self.k[layer_idx], self.v[layer_idx]
+
+    def key_positions(self, layer_type):
+        return self.pos[layer_type]
+
+    def append(self, layer_idx, layer_type, k, v):
+        """k, v: [B, H_kv, L, D] for the new tokens of one layer."""
+        if self.k[layer_idx] is not None:
+            k = torch.cat([self.k[layer_idx], k], dim=2)
+            v = torch.cat([self.v[layer_idx], v], dim=2)
+        keep = self._keep(layer_type)
+        if keep:
+            k, v = k[:, :, -keep:], v[:, :, -keep:]
+        self.k[layer_idx], self.v[layer_idx] = k.contiguous(), v.contiguous()
+
+    def append_positions(self, positions):
+        """Record the absolute positions of the tokens just appended (call once per forward, after all layers)."""
+        for lt in self.pos:
+            p = positions if self.pos[lt] is None else torch.cat([self.pos[lt], positions])
+            keep = self._keep(lt)
+            self.pos[lt] = p[-keep:] if keep else p
+
+
+class PerLayerPrefixCacheManager:
+    """ Prefix KV-cache manager for uniform-noise canvas diffusion (DiffusionGemma).
+
+    The cache holds the prompt and every committed canvas; it is written only when committed tokens are encoded
+    (one causal pass per canvas), and the denoising passes over the current canvas read it without writing.
+    """
+    def __init__(self, num_layers, layer_types, sliding_window=None):
+        self.past_key_values = PerLayerKVCache(num_layers, layer_types, sliding_window)
+
+    def get_key_values(self, block_start=None, block_end=None):
+        return self.past_key_values
+
+    @property
+    def seq_len(self):
+        return self.past_key_values.seq_length()
+
+
 class KVCacheFactory:
     """ KV-cache factory.
 
     This class generates KV-cache for the diffusion LLM when it runs diffusion iterations.
+    `per_layer=True` creates the per-layer prefix cache used by DiffusionGemma.
     """
-    def __init__(self, cache_type, cache_update_freq=None, backend='vllm', max_length=2048):
+    def __init__(self, cache_type, cache_update_freq=None, backend='vllm', max_length=2048, per_layer=False):
         self.cache_type = cache_type
         self.cache_update_freq = cache_update_freq
         self.backend = backend
         self.max_length = max_length
+        self.per_layer = per_layer
 
-    def create(self):
+    def create(self, config=None):
+        """ `config` (the model config) is required when `per_layer=True`, to size the per-layer cache. """
+        if self.per_layer:
+            if self.cache_type != 'prefix':
+                raise ValueError('the per-layer cache only supports prefix caching')
+            return PerLayerPrefixCacheManager(config.num_hidden_layers, config.layer_types,
+                                              getattr(config, 'sliding_window', None))
         return DiffusionKVCacheManager(cache_update_freq=self.cache_update_freq, cache_type=self.cache_type)
