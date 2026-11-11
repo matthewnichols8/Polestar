@@ -189,7 +189,13 @@ class EntropyBoundParallelDecoder(ParallelDecoder):
 
     def decode(self, logits, block_start, block_end, x, cur_step):
         """logits: [B, block, V] fp32. Returns `done` ([B] bool): the block has converged."""
-        canvas = x[:, block_start:block_end]
+        proposal = self._propose(logits, cur_step)
+        return self._finish(proposal, proposal['accepted'], block_start, block_end, x)
+
+    def _propose(self, logits, cur_step):
+        """Sample every position and apply the entropy bound. Returns a dict with `proc` (logits / T), `sampled`,
+        `argmax`, `entropy` and the entropy-bound `accepted` mask, all [B, C] except `proc` [B, C, V].
+        Subclasses may add acceptances before `_finish`."""
         proc = logits / self.temperature_at(cur_step)
         logp = torch.log_softmax(proc, dim=-1)
         probs = logp.exp()
@@ -202,6 +208,14 @@ class EntropyBoundParallelDecoder(ParallelDecoder):
         sorted_h, order = torch.sort(entropy, dim=-1)
         keep_sorted = (torch.cumsum(sorted_h, dim=-1) - sorted_h) <= self.entropy_bound
         accepted = torch.zeros_like(keep_sorted).scatter(-1, order, keep_sorted)
+        return {'proc': proc, 'sampled': sampled, 'argmax': argmax, 'entropy': entropy, 'accepted': accepted}
+
+    def _finish(self, proposal, accepted, block_start, block_end, x):
+        """Keep the `accepted` sampled tokens, re-noise the rest, apply the stop rule and broadcast rank 0's
+        decisions."""
+        canvas = x[:, block_start:block_end]
+        sampled, argmax, entropy = proposal['sampled'], proposal['argmax'], proposal['entropy']
+        B, C = sampled.shape
         x[:, block_start:block_end] = torch.where(accepted, sampled, self.noise((B, C), canvas.device))
 
         if self.stability_threshold == 0:
@@ -217,6 +231,7 @@ class EntropyBoundParallelDecoder(ParallelDecoder):
         broadcast_if_needed(x.data)
         broadcast_if_needed(argmax)
         broadcast_if_needed(done)
-        self.argmax, self.done = argmax, done.bool()
-        self.sc_logits = proc.to(torch.bfloat16)  # HF feeds back the processed logits in the embedding dtype
+        self.argmax, self.done, self.accepted = argmax, done.bool(), accepted
+        # HF feeds back the processed logits in the embedding dtype
+        self.sc_logits = proposal['proc'].to(torch.bfloat16)
         return self.done

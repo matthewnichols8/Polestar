@@ -174,6 +174,15 @@ class Attention(Holder):
         out = F.scaled_dot_product_attention(q, keys, vals, scale=1.0, enable_gqa=True)
         return linear16(out.transpose(1, 2).reshape(B, T, -1), self.o_proj.weight)
 
+    def attention_probs(self, x, cos, sin, keys):
+        """Softmax attention probabilities of every canvas query (input-normed x: [B, C, H], with RoPE) over
+        `keys` [B, H_kv, S, D]: the distribution `attend` uses, as [B, heads, C, S] fp32."""
+        B, C, _ = x.shape
+        q = linear16(x, self.q_proj.weight).view(B, C, self.num_heads, self.head_dim)
+        q = apply_rope(rmsnorm(q, self.q_norm.weight, self.eps), cos, sin).transpose(1, 2).float()
+        k = keys.float().repeat_interleave(self.num_heads // self.num_kv_heads, dim=1)       # [B, heads, S, D]
+        return torch.softmax(torch.matmul(q, k.transpose(-1, -2)), dim=-1)                  # scale = 1.0
+
     def proxy_attention(self, x_c, keys):
         """Attention probabilities of position-free queries (e.g. cluster centroids; input-normed, [K, H]) over
         `keys` [1, H_kv, S, D], without RoPE. Returns softmax probabilities [heads, K, S] fp32."""
@@ -515,13 +524,16 @@ class DiffusionGemmaModelLM(Holder):
             cache.append_positions(pos)
 
     @torch.no_grad()
-    def denoise(self, canvas, cache, self_conditioning_logits=None, layer_runner=None):
+    def denoise(self, canvas, cache, self_conditioning_logits=None, layer_runner=None, attention_probe=None):
         """Bidirectional pass over `canvas` [B, C] placed right after the cache.
         Returns softcapped fp32 logits [B, C, V]. Does not modify `cache`.
 
         layer_runner: optional cross-step canvas cache. It gets `begin_step(canvas)`, then runs every layer as
         `run_layer(layer, h, cos, sin, cache, positions)` (and may recompute only some tokens), then `end_step()`.
-        None runs every layer normally."""
+        None runs every layer normally.
+        attention_probe: optional callable; before the final layer runs it receives that layer's attention
+        probabilities for every canvas query, [B, heads, C, S] (used by Polestar-Commit's drift signal). It is
+        computed from the layer input, so it covers all tokens even when `layer_runner` recomputes only some."""
         if layer_runner is not None:
             layer_runner.begin_step(canvas)
         start = cache.seq_length()
@@ -537,8 +549,13 @@ class DiffusionGemmaModelLM(Holder):
         n = rmsnorm(soft, sc.pre_norm.weight, self.config.rms_norm_eps)
         s = linear16(gelu_tanh(linear16(n, sc.gate_proj.weight)) * linear16(n, sc.up_proj.weight), sc.down_proj.weight)
         h = rmsnorm(emb + s, None, self.config.rms_norm_eps)
-        for layer in self.layers:
+        last = len(self.layers) - 1
+        for i, layer in enumerate(self.layers):
             cos, sin = rope[layer.layer_type]
+            if attention_probe is not None and i == last:
+                x = layer.input_norm(h)
+                keys, _ = layer.self_attn.keys_values(x, cos, sin, cache)
+                attention_probe(layer.self_attn.attention_probs(x, cos, sin, keys))
             if layer_runner is None:
                 h = layer(h, cos, sin, cache, "decode", pos)
             else:

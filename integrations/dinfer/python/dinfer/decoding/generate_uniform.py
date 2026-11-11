@@ -262,11 +262,12 @@ class CanvasDiffusionIteration(DiffusionIteration):
     canvas_cache = None  # optional cross-step canvas cache, set by CanvasDiffusionLLM
 
     def forward(self, model, decoder, x, kv_cache, block_loc, cur_step):
-        if self.canvas_cache is None:
-            logits = model.denoise(x[:, block_loc.start:block_loc.end], kv_cache, decoder.sc_logits)
-        else:
-            logits = model.denoise(x[:, block_loc.start:block_loc.end], kv_cache, decoder.sc_logits,
-                                   layer_runner=self.canvas_cache)
+        kwargs = {}
+        if self.canvas_cache is not None:
+            kwargs['layer_runner'] = self.canvas_cache
+        if getattr(decoder, 'wants_final_attention', False):   # e.g. Polestar-Commit's drift signal
+            kwargs['attention_probe'] = decoder.observe_attention
+        logits = model.denoise(x[:, block_loc.start:block_loc.end], kv_cache, decoder.sc_logits, **kwargs)
         self.num_forwards += 1
         self.iter_no += 1
         return decoder.decode(logits, block_loc.start, block_loc.end, x, cur_step)
@@ -300,7 +301,8 @@ class CanvasDiffusionLLM(DiffusionLLM):
     canvas_cache : optional
         A cross-step canvas cache (e.g. polestar.integrations.dinfer_canvas_cache.CanvasPolestarCache). It is
         passed to `model.denoise` as `layer_runner` and must provide `reset()` (called at every canvas),
-        `begin_step(canvas)`, `run_layer(layer, h, cos, sin, cache, pos)`, `end_step()` and `stats()`.
+        `begin_step(canvas)`, `run_layer(layer, h, cos, sin, cache, pos)`, `end_step()` and `stats()`. If it has
+        `record_commits(n)` and the decoder has a `commit_callback` attribute, the decoder reports its commits to it.
 
     Batch size 1. After `generate`, `last_stats` holds per-call statistics (steps per canvas, new tokens), and
     `last_prompt_cache` holds a snapshot of the prefix cache right after the prompt was encoded. Passing that
@@ -320,6 +322,8 @@ class CanvasDiffusionLLM(DiffusionLLM):
         self.diff_iteration = CanvasDiffusionIteration()
         self.canvas_cache = canvas_cache
         self.diff_iteration.canvas_cache = canvas_cache
+        if canvas_cache is not None and hasattr(canvas_cache, 'record_commits') and hasattr(decoder, 'commit_callback'):
+            decoder.commit_callback = canvas_cache.record_commits   # e.g. Polestar-Commit -> Polestar-Cache refresh
         self.last_stats = None
         self.last_prompt_cache = None
 
@@ -392,6 +396,8 @@ class CanvasDiffusionLLM(DiffusionLLM):
                 stats['canvas_cache'].append(self.canvas_cache.stats())
 
             committed = decoder.argmax
+            if hasattr(decoder, 'end_canvas'):   # decoders with per-canvas state (e.g. Polestar-Commit)
+                stats.setdefault('commit', []).append(decoder.end_canvas(committed))
             x[:, block_loc.start:block_loc.end] = committed
             is_eos = torch.isin(committed, eos_ids)
             if self.early_stop and bool(is_eos.any()):
