@@ -36,7 +36,7 @@ def test_full_step_equals_the_normal_pass(model, prefix):
     canvas = _canvas(0)
     cache = CanvasPolestarCache(L)
     assert torch.equal(model.denoise(canvas, prefix, layer_runner=cache), model.denoise(canvas, prefix))
-    assert cache.stats() == {"full_steps": 1, "partial_steps": 0, "recompute_frac": []}
+    assert cache.stats() == {"full_steps": 1, "partial_steps": 0, "recompute_frac": [], "commit_refreshes": 0}
 
 
 class _Recorder:

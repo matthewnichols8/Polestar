@@ -14,9 +14,10 @@ the layer scalar, so changes from earlier layers still propagate) or its cached 
 recomputed for every canvas token from its current layer input, so recomputed queries see every token's latest
 state. Partial steps dequantize only the experts the selected tokens route to.
 
-The whole canvas is recomputed, and each layer's clusters rebuilt, on the first step of every canvas and every
-`refresh_every` steps. Selection runs on rank 0 and is broadcast, so expert-parallel ranks always process the
-same tokens.
+The whole canvas is recomputed, and each layer's clusters rebuilt, on the first step of every canvas, every
+`refresh_every` steps and, with `refresh_after_commits`, after more than that many positions were committed
+(frozen by Polestar-Commit) since the last full step - LLaDA's Commit-driven refresh (`refresh_after_tokens`).
+Selection runs on rank 0 and is broadcast, so expert-parallel ranks always process the same tokens.
 
 Usage::
 
@@ -54,7 +55,10 @@ class CanvasPolestarCache:
         Highest-drift clusters recomputed per layer on partial steps; a sequence gives one value per layer.
     refresh_every : int
         Recompute the whole canvas every this many steps of a canvas (step 0 is always full). 0 refreshes only on
-        step 0.
+        step 0 (and on commits, below).
+    refresh_after_commits : int, optional
+        Also recompute the whole canvas once more than this many positions were committed since the last full step
+        (reported through `record_commits`, which CanvasDiffusionLLM connects to the decoder's `commit_callback`).
     reuse : "delta" or "state"
     polestar_seed : int
         Seeds the k-means initialization.
@@ -67,6 +71,7 @@ class CanvasPolestarCache:
         clusters: int = 8,
         topk: int | list[int] | tuple[int, ...] = 4,
         refresh_every: int = 4,
+        refresh_after_commits: int | None = None,
         reuse: str = "delta",
         polestar_seed: int = 42,
     ) -> None:
@@ -76,6 +81,8 @@ class CanvasPolestarCache:
             raise ValueError("clusters must be positive")
         if refresh_every < 0:
             raise ValueError("refresh_every must be non-negative")
+        if refresh_after_commits is not None and refresh_after_commits < 0:
+            raise ValueError("refresh_after_commits must be non-negative")
         topk = list(topk) if isinstance(topk, (list, tuple)) else [topk] * num_layers
         if len(topk) != num_layers or any(k < 0 for k in topk):
             raise ValueError("topk must be a non-negative int or one value per layer")
@@ -83,6 +90,7 @@ class CanvasPolestarCache:
         self.clusters = clusters
         self.topk = topk
         self.refresh_every = refresh_every
+        self.refresh_after_commits = refresh_after_commits
         self.reuse = reuse
         self.polestar_seed = polestar_seed
         self.reset()
@@ -103,21 +111,34 @@ class CanvasPolestarCache:
         self.prev_proxy = [None] * L  # [1, heads, K, S]
         self.step_fracs = []
         self._fracs = []
+        self.commits_since_refresh = 0
+        self.commit_refreshes = 0
+
+    def record_commits(self, count: int) -> None:
+        """Positions committed by the decoder on the step that just ran."""
+        self.commits_since_refresh += count
 
     def stats(self) -> dict:
         partial = len(self.step_fracs)
-        return {"full_steps": self.step - partial, "partial_steps": partial, "recompute_frac": list(self.step_fracs)}
+        return {"full_steps": self.step - partial, "partial_steps": partial, "recompute_frac": list(self.step_fracs),
+                "commit_refreshes": self.commit_refreshes}
 
     def begin_step(self, canvas: torch.Tensor) -> None:
         """canvas: [1, C] input token ids of this denoising pass."""
         if canvas.shape[0] != 1:
             raise ValueError("the Polestar canvas cache supports batch size 1")
         canvas = canvas[0]
-        self.full = (
+        scheduled = (
             self._prev_canvas is None
             or self._prev_canvas.shape != canvas.shape
             or (self.refresh_every > 0 and self.step % self.refresh_every == 0)
         )
+        by_commits = (self.refresh_after_commits is not None
+                      and self.commits_since_refresh > self.refresh_after_commits)
+        self.full = scheduled or by_commits
+        self.commit_refreshes += int(by_commits and not scheduled)
+        if self.full:
+            self.commits_since_refresh = 0
         self.dirty = None if self.full else canvas != self._prev_canvas
         self._prev_canvas = canvas.clone()
         self.step += 1
