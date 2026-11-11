@@ -13,6 +13,17 @@
     "clusters": 8,
     "topk": 2,
     "refresh_every": 8,
-    "reuse": "delta"
+    "reuse": "delta",
+    "refresh_after_commits": null
+  },
+  "commit": {
+    "mode": "off",
+    "threshold": 0.9,
+    "lower_bound": 0.7,
+    "window": 3,
+    "gate_scale": 10.0,
+    "drift_cap": 2.0,
+    "confidence": "raw",
+    "freeze_threshold": null
   }
 }

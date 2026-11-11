@@ -208,3 +208,73 @@ reduced the time per step by 3%. On these GPUs, a step's cost is dominated by wo
 many tokens are recomputed (expert dequantization, weight reads), and the uniform-noise sampler re-noises most
 canvas positions in early steps, which limits reuse. These are single runs; repeat them before relying on
 differences of a few percent.
+
+### Polestar-Commit for DiffusionGemma
+
+LLaDA's Polestar-Commit commits masked tokens early. DiffusionGemma has no mask token: every canvas position
+is
+re-predicted on every step, and the entropy-bound sampler keeps (accepts) only the most confident positions
+for
+the next step. `PolestarCommitEntropyDecoder` in
+[`dinfer_canvas_commit.py`](../../src/polestar/integrations/dinfer_canvas_commit.py) ports each part of
+LLaDA's Commit that has a canvas equivalent. Each part is off by default:
+
+| LLaDA Polestar-Commit | DiffusionGemma port | Benchmark flag |
+|---|---|---|
+| Permanent commit at confidence ≥ τ | Freeze: once its raw confidence reaches τ, a position keeps its argmax token for the rest of the canvas | `--commit-freeze-threshold` |
+| Drift commit (0.7 < confidence < 0.9 and a final-layer attention drift jump) | The position is also accepted on that step | `--commit accept` |
+| Commits trigger Polestar-Cache refreshes | Full canvas step after more than N newly frozen positions (`CanvasPolestarCache(refresh_after_commits=N)`) | `--polestar-refresh-after-commits` |
+| Commit at least one token per step | Not needed: the entropy bound accepts at least one position per step | – |
+| Suffix-block commit | No equivalent: a denoising pass never sees the next canvas | – |
+
+`--commit record` computes the drift rule without changing any decision. With `--commit-trace-dir`, it writes
+per-step, per-position traces. [`analyze_dgemma_commit_trace.py`](benchmarks/analyze_dgemma_commit_trace.py)
+uses these traces to test whether drift identifies tokens that are already final, and to simulate the freeze.
+Its other settings (`--commit-threshold`, `--commit-lower-bound`, `--commit-window`, `--commit-gate-scale`,
+`--commit-drift-cap`, `--commit-confidence`) override the preset's `commit` block.
+
+```bash
+python integrations/dinfer/benchmarks/evaluate_gsm8k_diffusion_gemma.py \
+  --backend polestar --commit record --commit-trace-dir results/dgemma-commit-trace/traces \
+  --task gsm8k --limit 50 --seed 42 --gpus 0,1 --expert-dtype int8 --output-path results/dgemma-commit-trace
+
+python integrations/dinfer/benchmarks/analyze_dgemma_commit_trace.py \
+  --trace-dir results/dgemma-commit-trace/traces --output results/dgemma-commit-trace/REPORT.md
+
+python integrations/dinfer/benchmarks/evaluate_gsm8k_diffusion_gemma.py \
+  --backend polestar --commit accept --commit-freeze-threshold 0.999 --polestar-refresh-after-commits 24 \
+  --task gsm8k --limit 50 --seed 42 --gpus 0,1 --expert-dtype int8 --output-path results/dgemma-full-commit
+```
+
+**Measured results.** Same setup as the GSM8K results above.
+
+**Trace analysis (record mode).**
+- At equal confidence, positions with a drift event are no more likely to be final than positions without one.
+  Examples: 58.8% vs 64.5% for confidence in [0.7, 0.8), and 70.1% vs 78.5% in [0.8, 0.9) (record run without
+  Cache). This holds across all 54 tested drift settings.
+- The entropy-bound sampler already accepts about 147 of 256 positions per step, and 99.1–99.6% of the
+  accepted tokens are final.
+- Freezing at LLaDA's τ = 0.9 would freeze a wrong token 6–7.5% of the time; at τ = 0.999 the rate is
+  0.2–0.3%.
+
+**Full port** (Polestar-Cache on in every run; τ = 0.999, N = 24, which is LLaDA's 3 per 32-token block scaled
+to the 256-token canvas):
+
+| Seed | Run | Accuracy | Denoising steps | ms per step | Tokens per second |
+|---|---|---|---|---|---|
+| 42 | Polestar-Cache | 0.98 | 436 | 489 | 33.4 |
+| 42 | + full Commit | 0.94 | 382 | 537 | 34.5 |
+| 42 | + freeze and refresh on commits (no drift) | 0.96 | 430 | 510 | 33.0 |
+| 42 | + freeze only | 0.96 | 460 | 477 | 31.7 |
+| 43 | Polestar-Cache | 0.90 | 459 | 481 | 31.6 |
+| 43 | + full Commit | 0.94 | 456 | 509 | 30.5 |
+
+On DiffusionGemma, Polestar-Commit runs correctly but gives no reliable speedup.
+- **Steps don't drop reliably.** Step counts vary from 382 to 460 between equivalent runs, and the reduction
+  at seed 42 did not repeat at seed 43.
+- **Refreshing on commits costs 4–10% per step.** Most freezes happen in a canvas's first one or two steps, so
+  the refreshes replace Polestar-Cache's partial steps with full ones.
+- **Accuracy stays within run-to-run noise:** 0.90–0.98 across all runs.
+
+The entropy-bound sampler already keeps confident tokens. On a canvas that is partly re-noised every step,
+attention drift mostly reflects that noise rather than marking settled tokens.

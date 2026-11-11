@@ -3,7 +3,15 @@
 Both backends run google/diffusiongemma-26B-A4B-it through dInfer's CanvasDiffusionLLM with the same prompts
 and lm-evaluation-harness scoring as evaluation/run.py (tasks and few-shot counts from
 configs/evaluation/text.json; the few-shot context is sent as one chat turn and the answer is cut at the
-task's stop sequences). `--backend polestar` adds CanvasPolestarCache.
+task's stop sequences). `--backend polestar` adds CanvasPolestarCache. Independently, `--commit record|accept`
+uses Polestar-Commit's decoder (polestar.integrations.dinfer_canvas_commit): `record` keeps decisions unchanged and
+(with `--commit-trace-dir`) writes per-step drift/confidence traces; `accept` adds drift-gated acceptance.
+`--commit-freeze-threshold` adds Commit's permanent threshold commits and `--polestar-refresh-after-commits` makes
+those commits trigger Polestar-Cache refreshes. Full Polestar-Commit (all ported parts) with Polestar-Cache:
+
+    python integrations/dinfer/benchmarks/evaluate_gsm8k_diffusion_gemma.py \
+        --backend polestar --commit accept --commit-freeze-threshold 0.999 --polestar-refresh-after-commits 24 \
+        --task gsm8k --limit 50 --seed 42 --gpus 0,1 --expert-dtype int8 --output-path results/dgemma-full-commit
 
 The model's experts are split across the listed GPUs (expert parallel): rank 0 runs lm-eval and broadcasts
 each prompt; the other ranks decode in lockstep.
@@ -26,6 +34,7 @@ import torch.distributed as dist
 
 RELEASE_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "configs" / "diffusiongemma26b.json"
+COMMIT_KEYS = ("base_accepted", "drift_commits", "extra_accepted", "frozen")   # per-canvas Polestar-Commit stats
 
 
 def parse_args(argv=None):
@@ -41,6 +50,18 @@ def parse_args(argv=None):
     parser.add_argument("--max-new-tokens", type=int, help="override the preset")
     parser.add_argument("--polestar-topk", type=int, help="override the preset")
     parser.add_argument("--polestar-refresh-every", type=int, help="override the preset")
+    parser.add_argument("--polestar-refresh-after-commits", type=int,
+                        help="also refresh after more than this many committed (frozen) positions; -1 disables")
+    parser.add_argument("--commit", choices=["off", "record", "accept"], help="Polestar-Commit mode (preset default)")
+    parser.add_argument("--commit-threshold", type=float, help="override the preset")
+    parser.add_argument("--commit-lower-bound", type=float, help="override the preset")
+    parser.add_argument("--commit-window", type=int, help="override the preset")
+    parser.add_argument("--commit-gate-scale", type=float, help="override the preset")
+    parser.add_argument("--commit-drift-cap", type=float, help="override the preset")
+    parser.add_argument("--commit-confidence", choices=["raw", "tempered"], help="override the preset")
+    parser.add_argument("--commit-freeze-threshold", type=float,
+                        help="permanently commit positions whose raw confidence reaches this; 0 disables")
+    parser.add_argument("--commit-trace-dir", help="with --commit record: write per-step traces here (rank 0)")
     parser.add_argument("--prewarm-request", action="store_true", help="run each prompt once before timing it")
     parser.add_argument("--allow-code-execution", action="store_true")
     parser.add_argument("--master-port", type=int, default=29613)
@@ -56,10 +77,24 @@ def load_settings(args):
     for key, value in [("expert_dtype", args.expert_dtype), ("max_new_tokens", args.max_new_tokens)]:
         if value is not None:
             generation[key] = value
-    for key, value in [("topk", args.polestar_topk), ("refresh_every", args.polestar_refresh_every)]:
+    for key, value in [("topk", args.polestar_topk), ("refresh_every", args.polestar_refresh_every),
+                       ("refresh_after_commits", args.polestar_refresh_after_commits)]:
         if value is not None:
             polestar[key] = value
-    return preset["model_id"], generation, polestar
+    if polestar.get("refresh_after_commits") is not None and polestar["refresh_after_commits"] < 0:
+        polestar["refresh_after_commits"] = None
+    commit = {"mode": "off", **preset.get("commit", {})}
+    for key, value in [("mode", args.commit), ("threshold", args.commit_threshold),
+                       ("lower_bound", args.commit_lower_bound), ("window", args.commit_window),
+                       ("gate_scale", args.commit_gate_scale), ("drift_cap", args.commit_drift_cap),
+                       ("confidence", args.commit_confidence), ("freeze_threshold", args.commit_freeze_threshold)]:
+        if value is not None:
+            commit[key] = value
+    if not commit.get("freeze_threshold"):
+        commit["freeze_threshold"] = None
+    if args.commit_trace_dir and commit["mode"] != "record":
+        raise ValueError("--commit-trace-dir requires --commit record")
+    return preset["model_id"], generation, polestar, commit
 
 
 def resolve_checkpoint(model_id):
@@ -71,17 +106,16 @@ def resolve_checkpoint(model_id):
 
 
 class _Generator:
-    """One rank's model, decoder and (optionally) Polestar-Cache."""
+    """One rank's model, decoder (optionally Polestar-Commit's) and (optionally) Polestar-Cache."""
 
-    def __init__(self, path, generation, polestar, backend, seed, device):
+    def __init__(self, path, generation, polestar, backend, seed, device, commit, trace_dir=None):
         from dinfer import BlockIteratorFactory, CanvasDiffusionLLM, EntropyBoundParallelDecoder, KVCacheFactory
         from dinfer.model import DiffusionGemmaModelLM
 
         self.model = DiffusionGemmaModelLM.from_pretrained(
             path, device=device, expert_dtype=generation.get("expert_dtype", "bf16")
         )
-        decoder = EntropyBoundParallelDecoder(
-            self.model.config.vocab_size,
+        decoder_kwargs = dict(
             max_denoising_steps=generation.get("max_denoising_steps", 48),
             entropy_bound=generation.get("entropy_bound", 0.1),
             t_min=generation.get("t_min", 0.4),
@@ -89,6 +123,21 @@ class _Generator:
             seed=seed,
             device=device,
         )
+        self.recorder = None
+        if commit["mode"] == "off" and not commit.get("freeze_threshold"):
+            decoder = EntropyBoundParallelDecoder(self.model.config.vocab_size, **decoder_kwargs)
+        else:
+            from polestar.integrations.dinfer_canvas_commit import CommitTraceRecorder, PolestarCommitEntropyDecoder
+
+            if trace_dir:
+                self.recorder = CommitTraceRecorder(trace_dir)
+            decoder = PolestarCommitEntropyDecoder(
+                self.model.config.vocab_size, commit_mode=commit["mode"],
+                commit_threshold=commit.get("threshold", 0.9), commit_lower_bound=commit.get("lower_bound", 0.7),
+                commit_window=commit.get("window", 3), commit_gate_scale=commit.get("gate_scale", 10.0),
+                commit_drift_cap=commit.get("drift_cap", 2.0), commit_confidence=commit.get("confidence", "raw"),
+                commit_freeze_threshold=commit.get("freeze_threshold"), recorder=self.recorder, **decoder_kwargs,
+            )
         self.cache = None
         if backend == "polestar":
             from polestar.integrations.dinfer_canvas_cache import CanvasPolestarCache
@@ -100,7 +149,9 @@ class _Generator:
         )
         self.gen_length = generation.get("max_new_tokens", 512)
 
-    def generate(self, ids):
+    def generate(self, ids, request=None):
+        if self.recorder is not None and request is not None:
+            self.recorder.begin_request(request)
         return self.llm.generate(ids, gen_length=self.gen_length)
 
 
@@ -123,7 +174,7 @@ def _harness(generator, tokenizer, device, prewarm, timings):
     class DiffusionGemmaHarness(LM):
         def generate_until(self, requests):
             outputs = []
-            for request in requests:
+            for index, request in enumerate(requests):
                 context, options = request.args
                 prompt = tokenizer.apply_chat_template(
                     [{"role": "user", "content": context}], add_generation_prompt=True, tokenize=True
@@ -135,7 +186,7 @@ def _harness(generator, tokenizer, device, prewarm, timings):
                 torch.cuda.synchronize(device)
                 start = time.perf_counter()
                 _broadcast_ids(ids, device)
-                out = generator.generate(ids)
+                out = generator.generate(ids, request=f"req{index:04d}")
                 torch.cuda.synchronize(device)
                 elapsed = time.perf_counter() - start
                 stats = generator.llm.last_stats
@@ -143,10 +194,13 @@ def _harness(generator, tokenizer, device, prewarm, timings):
                 for stop in options.get("until", []):
                     text = text.split(stop)[0]
                 fractions = [f for canvas in stats.get("canvas_cache", []) for f in canvas["recompute_frac"]]
+                commit = stats.get("commit", [])
                 timings.append({
                     "prompt_tokens": ids.shape[1], "new_tokens": stats["new_tokens"], "seconds": elapsed,
                     "steps": stats["num_forwards"], "steps_per_canvas": stats["steps_per_canvas"],
                     "recompute_frac": fractions,
+                    "commit_refreshes": sum(c.get("commit_refreshes", 0) for c in stats.get("canvas_cache", [])),
+                    "commit": {key: sum(c[key] for c in commit) for key in COMMIT_KEYS} if commit else None,
                 })
                 outputs.append(text)
             return outputs
@@ -165,6 +219,8 @@ def _summary(timings):
     seconds = sum(t["seconds"] for t in timings)
     steps = sum(t["steps"] for t in timings)
     fractions = [f for t in timings for f in t["recompute_frac"]]
+    commits = [t["commit"] for t in timings if t.get("commit")]
+    commit_totals = {key: sum(c[key] for c in commits) for key in COMMIT_KEYS} if commits else None
     return {
         "requests": len(timings),
         "new_tokens": tokens,
@@ -174,6 +230,8 @@ def _summary(timings):
         "seconds_per_step": seconds / steps if steps else None,
         "tokens_per_step": tokens / steps if steps else None,
         "mean_recompute_frac_partial_steps": sum(fractions) / len(fractions) if fractions else None,
+        "commit_totals": commit_totals,
+        "cache_commit_refreshes": sum(t.get("commit_refreshes", 0) for t in timings),
     }
 
 
@@ -183,9 +241,10 @@ def worker(rank, gpus, args):
     dist.init_process_group("nccl", init_method=f"tcp://127.0.0.1:{args.master_port}",
                             rank=rank, world_size=len(gpus), device_id=device)
     try:
-        model_id, generation, polestar = load_settings(args)
+        model_id, generation, polestar, commit = load_settings(args)
         path = resolve_checkpoint(model_id)
-        generator = _Generator(path, generation, polestar, args.backend, args.seed, device)
+        generator = _Generator(path, generation, polestar, args.backend, args.seed, device, commit,
+                               trace_dir=args.commit_trace_dir if rank == 0 else None)
         if rank != 0:
             while (ids := _broadcast_ids(None, device)) is not None:
                 generator.generate(ids)
@@ -214,6 +273,7 @@ def worker(rank, gpus, args):
         results["polestar"] = {
             "model_preset": args.config, "model_id": model_id, "backend": args.backend,
             "generation": generation, "polestar_cache": polestar if args.backend == "polestar" else None,
+            "polestar_commit": commit if commit["mode"] != "off" or commit.get("freeze_threshold") else None,
             "seed": args.seed, "limit": args.limit, "gpus": gpus,
         }
         output = Path(args.output_path)
