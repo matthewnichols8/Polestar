@@ -1,0 +1,68 @@
+Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 1776.77it/s]
+Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 2042.11it/s]
+experts 0-63: int8, all 30 layers on GPU
+[serve] listening on http://127.0.0.1:8011/v1 (model name: diffusiongemma)
+[serve] prompt=    39 reused=     0 new= 106 steps= 11   6.78s finish=stop
+[serve] prompt=  4507 reused=     0 new=  42 steps=  5   7.87s finish=stop
+[serve] prompt=  4591 reused=  4507 new=  49 steps=  3   1.52s finish=tool_calls
+[serve] prompt=  4668 reused=  4591 new=  30 steps=  4   1.95s finish=tool_calls
+[serve] prompt=  5382 reused=  4668 new= 163 steps= 10   4.99s finish=stop
+[serve] prompt=  5679 reused=  5382 new=  82 steps=  6   3.04s finish=tool_calls
+[serve] prompt=  7787 reused=  5679 new= 248 steps= 18  10.38s finish=stop
+[serve] prompt=  8107 reused=  5679 new= 114 steps=  4   5.34s finish=tool_calls
+[serve] prompt=  8965 reused=  8107 new=  82 steps=  8   4.91s finish=stop
+[serve] prompt=  4544 reused=     0 new=  40 steps=  7   8.48s finish=stop
+[serve] prompt=  4637 reused=  4544 new=  49 steps=  3   1.54s finish=tool_calls
+[serve] prompt=  4714 reused=  4637 new=  32 steps=  3   1.54s finish=tool_calls
+[serve] prompt=  4986 reused=  4714 new=  30 steps=  3   1.88s finish=tool_calls
+[serve] prompt=  5700 reused=  4986 new= 116 steps= 13   6.17s finish=stop
+[serve] prompt=  5853 reused=  5700 new=  58 steps=  3   1.62s finish=tool_calls
+[serve] prompt=  7936 reused=  5853 new= 212 steps= 18  10.39s finish=stop
+[serve] prompt=  8229 reused=  7936 new= 136 steps= 10   5.03s finish=stop
+[serve] prompt=  8413 reused=  8229 new=  88 steps=  4   2.14s finish=tool_calls
+[serve] prompt=  9221 reused=  8413 new=  85 steps= 10   5.58s finish=stop
+[serve] prompt=  4500 reused=     0 new=  39 steps=  7   8.53s finish=stop
+[serve] prompt=  4573 reused=  4500 new=  49 steps=  3   1.53s finish=tool_calls
+[serve] prompt=  4650 reused=  4573 new=  32 steps=  3   1.55s finish=tool_calls
+[serve] prompt=  4922 reused=  4650 new=  16 steps=  3   1.81s finish=tool_calls
+[serve] prompt=  5764 reused=  4922 new=  31 steps=  3   2.53s finish=tool_calls
+[serve] prompt=  6713 reused=  5764 new=  61 steps= 10   5.52s finish=stop
+[serve] prompt=  6834 reused=  6713 new= 108 steps= 12   4.97s finish=stop
+[serve] prompt=  7001 reused=  6834 new= 134 steps=  4   2.07s finish=tool_calls
+[serve] prompt=  9214 reused=  7001 new= 149 steps=  9   7.51s finish=stop
+[serve] prompt=  9411 reused=  9214 new=  67 steps=  7   3.48s finish=stop
+[serve] prompt=  9506 reused=  9411 new=  95 steps=  4   2.20s finish=tool_calls
+W1123 18:15:54.109000 3121757 site-packages/torch/multiprocessing/spawn.py:169] Terminating process 3121782 via signal SIGTERM
+Traceback (most recent call last):
+  File "/scratch/mi72/agentic-dgemma/server/serve_openai.py", line 366, in <module>
+    main()
+  File "/scratch/mi72/agentic-dgemma/server/serve_openai.py", line 362, in main
+    torch.multiprocessing.spawn(worker, args=(gpus, args), nprocs=len(gpus))
+  File "/scratch/mi72/envs/polestar/lib/python3.10/site-packages/torch/multiprocessing/spawn.py", line 340, in spawn
+    return start_processes(fn, args, nprocs, join, daemon, start_method="spawn")
+  File "/scratch/mi72/envs/polestar/lib/python3.10/site-packages/torch/multiprocessing/spawn.py", line 296, in start_processes
+    while not context.join():
+  File "/scratch/mi72/envs/polestar/lib/python3.10/site-packages/torch/multiprocessing/spawn.py", line 215, in join
+    raise ProcessRaisedException(msg, error_index, failed_process.pid)
+torch.multiprocessing.spawn.ProcessRaisedException: 
+
+-- Process 1 terminated with the following error:
+Traceback (most recent call last):
+  File "/scratch/mi72/envs/polestar/lib/python3.10/site-packages/torch/multiprocessing/spawn.py", line 90, in _wrap
+    fn(i, *args)
+  File "/scratch/mi72/agentic-dgemma/server/serve_openai.py", line 291, in worker
+    engine.generate(ids, gen_length, slot, seed)
+  File "/scratch/mi72/agentic-dgemma/server/serve_openai.py", line 120, in generate
+    out = self.llm.generate(prompt, gen_length=gen_length, prefix_cache=prefix_cache)
+  File "/scratch/mi72/envs/polestar/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/scratch/mi72/Polestar/integrations/dinfer/python/dinfer/decoding/generate_uniform.py", line 390, in generate
+    done = self.diff_iteration.forward(model, decoder, x, kv_cache, block_loc, cur_step)
+  File "/scratch/mi72/Polestar/integrations/dinfer/python/dinfer/decoding/generate_uniform.py", line 273, in forward
+    return decoder.decode(logits, block_loc.start, block_loc.end, x, cur_step)
+  File "/scratch/mi72/Polestar/src/polestar/integrations/dinfer_canvas_commit.py", line 197, in decode
+    proposal = self._propose(logits, cur_step)
+  File "/scratch/mi72/Polestar/integrations/dinfer/python/dinfer/decoding/parallel_strategy.py", line 203, in _propose
+    sampled = torch.multinomial(probs.view(-1, V), 1, generator=self.generator).view(B, C)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 256.00 MiB. GPU 1 has a total capacity of 23.46 GiB of which 248.81 MiB is free. Including non-PyTorch memory, this process has 23.21 GiB memory in use. Of the allocated memory 21.23 GiB is allocated by PyTorch, and 1.64 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+

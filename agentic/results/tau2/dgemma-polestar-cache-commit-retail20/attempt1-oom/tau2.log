@@ -1,0 +1,213 @@
+2026-11-23 18:13:14.960 | DEBUG    | tau2.registry:<module>:297 - Voice dependencies not installed, skipping voice user registration
+╭────────────────────────── Simulation Configuration ──────────────────────────╮
+│ Domain: retail  Task Set: Default  Tasks: All                                │
+│ Trials: 1  Max Steps: 200  Max Errors: 10                                    │
+│                                                                              │
+│ Agent: llm_agent → openai/diffusiongemma                                     │
+│ User:  user_simulator → gpt-4.1                                              │
+│                                                                              │
+│ Save: dgemma-polestar-cache-commit-retail20  Concurrency: 1  Verbose: False  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+0/20 (trial 1/1). Running task 0, trial 1
+2026-11-23 18:13:27.712 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:13:30.324 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:13:32.342 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:13:37.370 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:13:42.020 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 0/20 complete. Avg reward: N/A. 1 running: 0.0(30s)
+2026-11-23 18:13:52.454 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:13:58.752 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:03.696 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 0                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 47.34s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0103                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_order_details [read] ✅ 1.0                                   │
+│ - 2: agent get_product_details [read] ✅ 1.0                                 │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 5/5 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+1/20 (trial 1/1). Running task 1, trial 1
+Status: 1/20 complete. Avg reward: 1.00 (N=1). 1 running: 1.0(11s)
+2026-11-23 18:14:16.930 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:19.635 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:21.205 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:23.128 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:29.352 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:31.883 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:42.324 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 1/20 complete. Avg reward: 1.00 (N=1). 1 running: 1.0(41s)
+2026-11-23 18:14:48.606 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:51.983 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:14:57.632 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 1                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 52.43s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0148                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_order_details [read] ✅ 1.0                                   │
+│ - 2: agent get_product_details [read] ✅ 1.0                                 │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 5/5 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+2/20 (trial 1/1). Running task 2, trial 1
+2026-11-23 18:15:09.862 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:12.314 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:13.900 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:15.749 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 2/20 complete. Avg reward: 1.00 (N=2). 1 running: 2.0(17s)
+2026-11-23 18:15:18.328 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:24.077 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:30.112 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:33.204 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:40.768 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:45.743 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 2/20 complete. Avg reward: 1.00 (N=2). 1 running: 2.0(47s)
+2026-11-23 18:15:48.783 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-23 18:15:56.676 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 1/3 for task 2: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:16:02.806 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 2/3 for task 2: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:16:09.367 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 3/3 for task 2: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:16:15.537 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+2026-11-23 18:16:15.549 | ERROR    | tau2.runner.progress:run_with_retry:105 - Task 2 failed after 4 attempts: litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Task 2 failed permanently after 4 attempts: litellm.InternalServerError: 
+InternalServerError: OpenAIException - Connection error.
+3/20 (trial 1/1). Running task 3, trial 1
+Status: 3/20 complete. Avg reward: 1.00 (N=2). 1 running: 3.0(1s)
+2026-11-23 18:16:20.753 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 1/3 for task 3: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:16:27.297 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 2/3 for task 3: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:16:34.179 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 3/3 for task 3: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:16:40.927 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+2026-11-23 18:16:40.939 | ERROR    | tau2.runner.progress:run_with_retry:105 - Task 3 failed after 4 attempts: litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Task 3 failed permanently after 4 attempts: litellm.InternalServerError: 
+InternalServerError: OpenAIException - Connection error.
+4/20 (trial 1/1). Running task 4, trial 1
+Status: 4/20 complete. Avg reward: 1.00 (N=2). 1 running: 4.0(5s)
+2026-11-23 18:16:46.935 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 1/3 for task 4: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:16:53.520 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 2/3 for task 4: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:17:00.010 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 3/3 for task 4: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:17:07.486 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+2026-11-23 18:17:07.498 | ERROR    | tau2.runner.progress:run_with_retry:105 - Task 4 failed after 4 attempts: litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Task 4 failed permanently after 4 attempts: litellm.InternalServerError: 
+InternalServerError: OpenAIException - Connection error.
+5/20 (trial 1/1). Running task 5, trial 1
+2026-11-23 18:17:12.853 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 1/3 for task 5: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+Status: 5/20 complete. Avg reward: 1.00 (N=2). 1 running: 5.0(3s R1)
+2026-11-23 18:17:19.375 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 2/3 for task 5: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:17:25.928 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Retry 3/3 for task 5: litellm.InternalServerError: InternalServerError: 
+OpenAIException - Connection error.
+2026-11-23 18:17:32.443 | ERROR    | tau2.utils.llm_utils:_generate_once:685 - litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+2026-11-23 18:17:32.455 | ERROR    | tau2.runner.progress:run_with_retry:105 - Task 5 failed after 4 attempts: litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.
+
+  Task 5 failed permanently after 4 attempts: litellm.InternalServerError: 
+InternalServerError: OpenAIException - Connection error.
+6/20 (trial 1/1). Running task 6, trial 1

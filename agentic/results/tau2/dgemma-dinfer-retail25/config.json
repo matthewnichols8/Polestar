@@ -1,0 +1,4 @@
+{"label":"dgemma-dinfer-retail25","model":"google/diffusiongemma-26B-A4B-it","framework":"dInfer (Polestar fork, bundled)","polestar_cache":false,"polestar_commit":false,
+ "server_flags":"--gpus 0,1 --port 8000","polestar_repo_commit":"9af281c","polestar_repo_branch":"feature/dgemma-prefix-reuse","expert_dtype":"int8","gpus":"2x TITAN RTX",
+ "entropy_bound":0.1,"max_denoising_steps":48,"thinking":false,"prefix_reuse":true,"max_tokens":512,
+ "tau2":{"domain":"retail","split":"base","num_tasks":25,"num_trials":1,"user_llm":"gpt-4.1","tau2_bench_commit":"19f13ea"}}

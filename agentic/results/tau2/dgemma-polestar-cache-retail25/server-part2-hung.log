@@ -1,0 +1,54 @@
+Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 1522.46it/s]
+Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 2090.03it/s]
+experts 0-63: int8, all 30 layers on GPU
+[serve] listening on http://127.0.0.1:8000/v1 (model name: diffusiongemma)
+[serve] prompt=  4512 reused=     0 new=  54 steps=  5   7.97s finish=stop
+[serve] prompt=  4611 reused=  4512 new=  46 steps=  3   1.32s finish=tool_calls
+[serve] prompt=  4684 reused=  4611 new=  31 steps=  3   1.38s finish=tool_calls
+[serve] prompt=  4952 reused=  4684 new= 121 steps= 12   4.86s finish=stop
+[serve] prompt=  5145 reused=  4952 new=  30 steps=  2   1.09s finish=tool_calls
+[serve] prompt=  5777 reused=  5145 new= 105 steps=  7   3.53s finish=stop
+[serve] prompt=  5922 reused=  5777 new=  30 steps=  2   1.07s finish=tool_calls
+[serve] prompt=  6479 reused=  5922 new= 172 steps= 10   4.86s finish=stop
+[serve] prompt=  6705 reused=  6479 new= 112 steps=  4   1.84s finish=tool_calls
+[serve] prompt= 10865 reused=  6705 new= 275 steps= 18  14.09s finish=stop
+[serve] prompt= 11184 reused= 10865 new= 166 steps=  5   2.79s finish=tool_calls
+[serve] prompt= 11927 reused= 11184 new=  76 steps= 13   6.77s finish=stop
+[serve] prompt= 12045 reused= 11927 new=  30 steps=  2   1.23s finish=tool_calls
+[serve] prompt= 12587 reused= 12045 new=  60 steps= 10   5.03s finish=stop
+[serve] prompt=  4518 reused=     0 new=  42 steps=  6   7.87s finish=stop
+[serve] prompt=  4604 reused=  4518 new=  46 steps=  3   1.31s finish=tool_calls
+[serve] prompt=  4677 reused=  4604 new=  31 steps=  3   1.37s finish=tool_calls
+[serve] prompt=  4945 reused=  4677 new=  98 steps= 14   5.38s finish=stop
+[serve] prompt=  5138 reused=  4945 new= 107 steps=  5   2.23s finish=tool_calls
+[serve] prompt=  6895 reused=  5138 new= 144 steps= 14   7.82s finish=stop
+[serve] prompt=  7189 reused=  5138 new= 255 steps= 18  10.11s finish=stop
+[serve] prompt=  7499 reused=  7189 new=  58 steps=  4   2.20s finish=tool_calls
+[serve] prompt=  7700 reused=  7499 new=  45 steps=  3   1.54s finish=tool_calls
+[serve] prompt=  7760 reused=  7700 new= 214 steps= 14   5.69s finish=stop
+[serve] prompt=  8020 reused=  7760 new= 114 steps=  4   2.12s finish=tool_calls
+[serve] prompt=  8712 reused=  8020 new=  88 steps=  8   4.16s finish=stop
+[serve] prompt=  4479 reused=     0 new=  38 steps=  4   7.30s finish=stop
+[serve] prompt=  4555 reused=  4479 new=  46 steps=  3   1.32s finish=tool_calls
+[serve] prompt=  4628 reused=  4555 new=  96 steps= 12   4.37s finish=stop
+[serve] prompt=  4800 reused=  4628 new=  31 steps=  2   1.09s finish=tool_calls
+[serve] prompt=  5065 reused=  4800 new=  82 steps=  4   2.07s finish=tool_calls
+[serve] prompt=  6799 reused=  5065 new= 169 steps= 12   7.10s finish=stop
+[serve] prompt=  6992 reused=  6799 new= 148 steps=  7   2.80s finish=tool_calls
+[serve] prompt=  7592 reused=  6992 new=  76 steps=  4   2.55s finish=tool_calls
+[serve] prompt=  7899 reused=  7592 new= 102 steps=  7   3.28s finish=stop
+[serve] prompt=  8039 reused=  7899 new=  54 steps= 10   3.87s finish=stop
+[serve] prompt=  8122 reused=  8039 new=  81 steps=  3   1.48s finish=tool_calls
+[serve] prompt=  8437 reused=  8122 new=  56 steps=  5   2.58s finish=stop
+[serve] prompt=  4537 reused=     0 new=  43 steps=  7   8.36s finish=stop
+[serve] prompt=  4615 reused=  4537 new=  47 steps=  3   1.35s finish=tool_calls
+[serve] prompt=  4689 reused=  4615 new=  31 steps=  3   1.41s finish=tool_calls
+[serve] prompt=  4946 reused=  4689 new= 104 steps= 14   5.49s finish=stop
+[serve] prompt=  5103 reused=  4946 new=  31 steps=  8   3.17s finish=tool_calls
+[serve] prompt=  5357 reused=  5103 new= 108 steps=  4   1.84s finish=tool_calls
+[serve] prompt=  7507 reused=  5357 new= 205 steps= 12   8.05s finish=stop
+[serve] prompt=  7784 reused=  7507 new=  58 steps=  4   2.15s finish=tool_calls
+[serve] prompt=  9896 reused=  7784 new= 279 steps= 15  10.19s finish=stop
+[serve] prompt= 10222 reused=  9896 new= 256 steps=  7   4.02s finish=tool_calls
+/scratch/mi72/envs/polestar/lib/python3.10/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 2 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

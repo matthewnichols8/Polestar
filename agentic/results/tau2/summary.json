@@ -1,0 +1,126 @@
+{
+  "dgemma-dinfer-retail25": {
+    "tasks": 25,
+    "solved": 16.0,
+    "rewards": {
+      "0": 1.0,
+      "1": 1.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 1.0,
+      "6": 1.0,
+      "7": 1.0,
+      "8": 1.0,
+      "9": 1.0,
+      "10": 0.0,
+      "11": 1.0,
+      "12": 1.0,
+      "13": 1.0,
+      "14": 0.0,
+      "15": 1.0,
+      "16": 1.0,
+      "17": 1.0,
+      "18": 0.0,
+      "19": 0.0,
+      "20": 0.0,
+      "21": 1.0,
+      "22": 0.0,
+      "23": 1.0,
+      "24": 1.0
+    },
+    "user_cost_usd": 0.34,
+    "mean_task_seconds": 49.8,
+    "mean_messages": 25.2,
+    "agent_turns": 288,
+    "agent_tool_call_turns": 122,
+    "server_requests": 291,
+    "malformed_calls": 0,
+    "self_tool_response": 0,
+    "empty_replies": 0,
+    "mean_prompt_tokens": 6310,
+    "max_prompt_tokens": 12745,
+    "prefix_reused_frac": 0.861,
+    "mean_request_seconds": 4.16,
+    "steps": 2015,
+    "ms_per_step_incl_prefill": 601,
+    "new_tokens": 24950
+  },
+  "dgemma-polestar-cache-retail25": {
+    "tasks": 25,
+    "solved": 20.0,
+    "rewards": {
+      "0": 1.0,
+      "1": 1.0,
+      "2": 0.0,
+      "3": 0.0,
+      "4": 0.0,
+      "5": 1.0,
+      "6": 1.0,
+      "7": 1.0,
+      "8": 1.0,
+      "9": 1.0,
+      "10": 1.0,
+      "11": 1.0,
+      "12": 1.0,
+      "13": 0.0,
+      "14": 1.0,
+      "15": 1.0,
+      "16": 1.0,
+      "17": 1.0,
+      "18": 1.0,
+      "19": 1.0,
+      "20": 0.0,
+      "21": 1.0,
+      "22": 1.0,
+      "23": 1.0,
+      "24": 1.0
+    },
+    "user_cost_usd": 0.343,
+    "mean_task_seconds": 49.5,
+    "mean_messages": 25.9,
+    "agent_turns": 295,
+    "agent_tool_call_turns": 127,
+    "server_requests": 293,
+    "malformed_calls": 1,
+    "self_tool_response": 0,
+    "empty_replies": 0,
+    "mean_prompt_tokens": 6515,
+    "max_prompt_tokens": 13041,
+    "prefix_reused_frac": 0.869,
+    "mean_request_seconds": 3.96,
+    "steps": 2044,
+    "ms_per_step_incl_prefill": 568,
+    "new_tokens": 25680,
+    "cache_full_steps": 407,
+    "cache_partial_steps": 1637,
+    "mean_recompute_frac_partial": 0.649,
+    "requests_with_cache_stats": 293
+  },
+  "disagreements": {
+    "10": [
+      0.0,
+      1.0
+    ],
+    "13": [
+      1.0,
+      0.0
+    ],
+    "14": [
+      0.0,
+      1.0
+    ],
+    "18": [
+      0.0,
+      1.0
+    ],
+    "19": [
+      0.0,
+      1.0
+    ],
+    "22": [
+      0.0,
+      1.0
+    ]
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "astropy__astropy-14508": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "astropy__astropy-14508",
+    "model_patch": ""
+  },
+  "astropy__astropy-14995": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "astropy__astropy-14995",
+    "model_patch": ""
+  },
+  "astropy__astropy-7166": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "astropy__astropy-7166",
+    "model_patch": "diff --git a/astropy/utils/misc.py b/astropy/utils/misc.py\nindex de3fb01d1..cceaeb957 100644\n--- a/astropy/utils/misc.py\n+++ b/astropy/utils/misc.py\n@@ -528,7 +528,7 @@ class InheritDocstrings(type):\n                 not key.startswith('_'))\n \n         for key, val in dct.items():\n-            if (inspect.isfunction(val) and\n+            if ((inspect.isfunction(val) or isinstance(val, property)) and\n                 is_public_member(key) and\n                 val.__doc__ is None):\n                 for base in cls.__mro__[1:]:\n"
+  },
+  "django__django-11292": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11292",
+    "model_patch": ""
+  },
+  "django__django-11400": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11400",
+    "model_patch": ""
+  },
+  "django__django-11532": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11532",
+    "model_patch": ""
+  },
+  "django__django-11734": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11734",
+    "model_patch": ""
+  },
+  "django__django-12125": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-12125",
+    "model_patch": ""
+  },
+  "django__django-13401": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-13401",
+    "model_patch": ""
+  },
+  "django__django-13417": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-13417",
+    "model_patch": "diff --git a/django/db/models/query.py b/django/db/models/query.py\nindex 85cd8311a7..2d153f0f12 100644\n--- a/django/db/models/query.py\n+++ b/django/db/models/query.py\n@@ -1224,6 +1224,8 @@ class QuerySet:\n             return True\n         if self.query.extra_order_by or self.query.order_by:\n             return True\n+        if self.query.group_by:\n+            return False\n         elif self.query.default_ordering and self.query.get_meta().ordering:\n             return True\n         else:\n"
+  },
+  "django__django-13741": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-13741",
+    "model_patch": "--- a/django/contrib/auth/forms.py\n+++ b/django/contrib/auth/forms.py\n@@ -73,7 +73,8 @@\n     widget = ReadOnlyPasswordHashWidget\n \n     def __init__(self, *args, **kwargs):\n-        kwargs.setdefault(\"required\", False)\n+        kwargs.setdefault(\"required\", False)\n+        kwargs.setdefault(\"disabled\", True)\n         super().__init__(*args, **kwargs)\n \n"
+  },
+  "django__django-14034": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-14034",
+    "model_patch": "diff --git a/django/forms/fields.py b/django/forms/fields.py\nindex 65d6a9ec82..653e08a775 100644\n--- a/django/forms/fields.py\n+++ b/django/forms/fields.py\n@@ -1026,6 +1026,8 @@ class MultiValueField(Field):\n                 if self.required:\n                     raise ValidationError(self.error_messages['required'], code='required')\n                 else:\n+                    if any(f.required for f in self.fields):\n+                        raise ValidationError(self.error_messages['incomplete'], code='incomplete')\n                     return self.compress([])\n         else:\n             raise ValidationError(self.error_messages['invalid'], code='invalid')\n"
+  },
+  "django__django-16100": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-16100",
+    "model_patch": ""
+  },
+  "matplotlib__matplotlib-25479": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "matplotlib__matplotlib-25479",
+    "model_patch": ""
+  },
+  "pydata__xarray-3677": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "pydata__xarray-3677",
+    "model_patch": ""
+  },
+  "pylint-dev__pylint-7080": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "pylint-dev__pylint-7080",
+    "model_patch": ""
+  },
+  "pytest-dev__pytest-7571": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "pytest-dev__pytest-7571",
+    "model_patch": ""
+  },
+  "scikit-learn__scikit-learn-25973": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "scikit-learn__scikit-learn-25973",
+    "model_patch": ""
+  },
+  "scikit-learn__scikit-learn-26323": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "scikit-learn__scikit-learn-26323",
+    "model_patch": ""
+  },
+  "sympy__sympy-16766": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "sympy__sympy-16766",
+    "model_patch": "--- /dev/fd/63\t2026-11-23 23:57:02.939620903 +0000\n+++ sympy/printing/pycode.py\t2026-11-23 23:54:53.143021902 +0000\n@@ -356,6 +356,9 @@\n     def _print_Not(self, expr):\n         PREC = precedence(expr)\n         return self._operators['not'] + self.parenthesize(expr.args[0], PREC)\n+    def _print_Indexed(self, expr):\n+        base, *index = expr.args\n+        return \"{}[{}]\".format(str(base), \", \".join([self._print(ind) for ind in index]))\n \n \n for k in PythonCodePrinter._kf:\n"
+  }
+}

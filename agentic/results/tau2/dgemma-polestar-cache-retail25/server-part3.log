@@ -1,0 +1,25 @@
+Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 2728.73it/s]
+Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 2843.25it/s]
+experts 0-63: int8, all 30 layers on GPU
+[serve] listening on http://127.0.0.1:8000/v1 (model name: diffusiongemma)
+[serve] prompt=  4534 reused=     0 new=  43 steps=  4   7.71s finish=stop
+[serve] prompt=  4613 reused=  4534 new=  47 steps=  3   1.31s finish=tool_calls
+[serve] prompt=  4687 reused=  4613 new=  42 steps=  8   3.02s finish=stop
+[serve] prompt=  4781 reused=  4687 new=  31 steps=  2   1.04s finish=tool_calls
+[serve] prompt=  5035 reused=  4781 new= 108 steps= 11   4.21s finish=stop
+[serve] prompt=  5191 reused=  5035 new= 108 steps=  4   1.68s finish=tool_calls
+[serve] prompt=  7338 reused=  5191 new= 346 steps= 23  12.49s finish=stop
+[serve] prompt=  7762 reused=  7338 new= 129 steps= 16   6.89s finish=stop
+[serve] prompt=  7910 reused=  7762 new=  85 steps=  3   1.49s finish=tool_calls
+[serve] prompt= 10897 reused=  7910 new= 382 steps= 13  10.76s finish=stop
+[serve] prompt= 11327 reused= 10897 new= 256 steps=  7   4.16s finish=tool_calls
+[serve] prompt= 13041 reused= 11327 new= 210 steps= 13   8.53s finish=stop
+[serve] prompt=  4493 reused=     0 new=  41 steps=  6   7.81s finish=stop
+[serve] prompt=  4582 reused=  4493 new=  47 steps=  3   1.32s finish=tool_calls
+[serve] prompt=  4656 reused=  4582 new=  31 steps=  2   1.03s finish=tool_calls
+[serve] prompt=  4913 reused=  4656 new=  72 steps=  8   3.33s finish=stop
+[serve] prompt=  5024 reused=  4913 new=  30 steps=  2   1.04s finish=tool_calls
+[serve] prompt=  5763 reused=  5024 new=  67 steps= 11   4.74s finish=stop
+[serve] prompt=  5911 reused=  5763 new=  79 steps=  7   2.88s finish=stop
+/scratch/mi72/envs/polestar/lib/python3.10/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 2 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

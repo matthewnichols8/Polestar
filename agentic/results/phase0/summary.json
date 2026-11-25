@@ -1,0 +1,82 @@
+{
+  "base": {
+    "correct": 0.9777777777777777,
+    "by_level": {
+      "L1": 1.0,
+      "L2": 1.0,
+      "L3": 0.8333333333333334,
+      "L4": 1.0,
+      "L5": 1.0,
+      "L6": 1.0,
+      "L7": 1.0
+    },
+    "format_ok_given_call": 1.0,
+    "self_tool_response": 0.6,
+    "seconds_per_probe": 2.673111111111111,
+    "n": 45
+  },
+  "thinking": {
+    "correct": 0.9111111111111111,
+    "by_level": {
+      "L1": 1.0,
+      "L2": 1.0,
+      "L3": 0.5,
+      "L4": 0.8333333333333334,
+      "L5": 1.0,
+      "L6": 1.0,
+      "L7": 1.0
+    },
+    "format_ok_given_call": 1.0,
+    "self_tool_response": 0.6,
+    "seconds_per_probe": 4.418666666666667,
+    "n": 45
+  },
+  "eb0.05": {
+    "correct": 0.9777777777777777,
+    "by_level": {
+      "L1": 1.0,
+      "L2": 1.0,
+      "L3": 0.8333333333333334,
+      "L4": 1.0,
+      "L5": 1.0,
+      "L6": 1.0,
+      "L7": 1.0
+    },
+    "format_ok_given_call": 1.0,
+    "self_tool_response": 0.6,
+    "seconds_per_probe": 2.8597777777777775,
+    "n": 45
+  },
+  "steps96": {
+    "correct": 1.0,
+    "by_level": {
+      "L1": 1.0,
+      "L2": 1.0,
+      "L3": 1.0,
+      "L4": 1.0,
+      "L5": 1.0,
+      "L6": 1.0,
+      "L7": 1.0
+    },
+    "format_ok_given_call": 1.0,
+    "self_tool_response": 0.6,
+    "seconds_per_probe": 2.782666666666667,
+    "n": 45
+  },
+  "polestar": {
+    "correct": 1.0,
+    "by_level": {
+      "L1": 1.0,
+      "L2": 1.0,
+      "L3": 1.0,
+      "L4": 1.0,
+      "L5": 1.0,
+      "L6": 1.0,
+      "L7": 1.0
+    },
+    "format_ok_given_call": 1.0,
+    "self_tool_response": 0.6,
+    "seconds_per_probe": 2.563111111111112,
+    "n": 45
+  }
+}

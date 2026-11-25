@@ -1,0 +1,138 @@
+#!/scratch/mi72/envs/swe/bin/python
+"""A `singularity` stand-in for mini-swe-agent, backed by bubblewrap and unpacked Docker images.
+
+mini-swe-agent's SingularityEnvironment calls exactly two subcommands (minisweagent/environments/singularity.py):
+    <exe> build --sandbox DIR docker://IMAGE
+    <exe> [--quiet] exec [--contain] [--cleanenv] [--fakeroot] [--pwd P] [--env K=V]... --writable DIR bash -c CMD
+`build` unpacks IMAGE once into a cache (crane export, no Docker daemon) and copies it to DIR, so every agent run
+starts from a clean filesystem. `exec` runs the command with DIR as `/`, as uid 0 inside an unprivileged user
+namespace (bwrap), with the image's environment variables. Network is shared, as in Docker.
+
+Also usable by hand:  fakesingularity fetch docker://IMAGE   (fill the cache only)
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+CRANE = os.environ.get("FAKESING_CRANE", str(HERE / "bin" / "crane"))
+CACHE = Path(os.environ.get("FAKESING_CACHE", "/scratch/mi72/swe-rootfs"))
+BWRAP = os.environ.get("FAKESING_BWRAP", "bwrap")
+ENV_FILE = ".fakesingularity-env.json"   # image ENV, stored inside the rootfs at /
+
+
+def die(msg, code=2):
+    print(f"fakesingularity: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def image_ref(image):
+    return image[len("docker://"):] if image.startswith("docker://") else image
+
+
+def cache_dir(ref):
+    return CACHE / ref.replace("/", "_").replace(":", "_")
+
+
+def fetch(image):
+    """Unpack IMAGE into the cache (once). Returns the cached rootfs path."""
+    ref = image_ref(image)
+    root = cache_dir(ref)
+    if (root / ENV_FILE).is_file():
+        return root
+    CACHE.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix=root.name + ".partial-", dir=CACHE))
+    config = json.loads(subprocess.run([CRANE, "config", ref], check=True, capture_output=True, text=True).stdout)
+    # crane export flattens the layers (whiteouts applied); device nodes and ownership can't be restored
+    # without root and aren't needed (bwrap mounts /dev and /proc).
+    export = subprocess.Popen([CRANE, "export", ref, "-"], stdout=subprocess.PIPE)
+    untar = subprocess.run(["tar", "-x", "-C", str(tmp), "--no-same-owner", "--no-same-permissions",
+                            "--delay-directory-restore", "--exclude=dev/*"],
+                           stdin=export.stdout, capture_output=True, text=True)
+    export.stdout.close()
+    if export.wait() != 0:
+        shutil.rmtree(tmp, ignore_errors=True)
+        die(f"crane export {ref} failed")
+    if untar.returncode not in (0, 2):   # 2 = some members (e.g. special files) could not be created
+        shutil.rmtree(tmp, ignore_errors=True)
+        die(f"tar failed for {ref}: {untar.stderr[-2000:]}")
+    subprocess.run(["chmod", "-R", "u+rwX", str(tmp)], check=False)   # so we can copy and later delete it
+    env = config.get("config", {}).get("Env") or []
+    (tmp / ENV_FILE).write_text(json.dumps({"env": env, "workdir": config.get("config", {}).get("WorkingDir", "")}))
+    try:
+        tmp.rename(root)
+    except OSError:   # another process finished first
+        shutil.rmtree(tmp, ignore_errors=True)
+    return root
+
+
+def build(args):
+    if len(args) != 3 or args[0] != "--sandbox":
+        die(f"unsupported build arguments: {args}")
+    sandbox, image = Path(args[1]), args[2]
+    root = fetch(image)
+    if sandbox.exists():
+        die(f"sandbox {sandbox} already exists")
+    subprocess.run(["cp", "-a", "--reflink=auto", str(root), str(sandbox)], check=True)
+
+
+def exec_(args):
+    pwd, env, sandbox = "/", {}, None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in ("--contain", "--cleanenv", "--fakeroot"):
+            i += 1
+        elif a == "--pwd":
+            pwd, i = args[i + 1], i + 2
+        elif a == "--env":
+            k, _, v = args[i + 1].partition("=")
+            env[k], i = v, i + 2
+        elif a == "--writable":
+            sandbox, i = args[i + 1], i + 2
+            break
+        else:
+            die(f"unsupported exec option: {a}")
+    command = args[i:]
+    if sandbox is None or not command:
+        die("exec needs --writable DIR and a command")
+    meta = json.loads((Path(sandbox) / ENV_FILE).read_text())
+    full_env = {"HOME": "/root", "USER": "root", "TERM": "dumb"}
+    for item in meta["env"]:
+        k, _, v = item.partition("=")
+        full_env[k] = v
+    full_env.update(env)
+    cmd = [BWRAP, "--unshare-user", "--uid", "0", "--gid", "0", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
+           "--hostname", "testbed", "--die-with-parent", "--bind", sandbox, "/", "--dev", "/dev", "--proc", "/proc",
+           "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf", "--clearenv"]
+    for k, v in full_env.items():
+        cmd += ["--setenv", k, v]
+    cmd += ["--chdir", pwd, *command]
+    os.execvp(cmd[0], cmd)   # replace this process, so a timeout kill reaches bwrap (and, via the pid ns, everything)
+
+
+def main(argv):
+    while argv and argv[0].startswith("--"):   # global flags such as --quiet
+        argv = argv[1:]
+    if not argv:
+        die("no subcommand")
+    sub, rest = argv[0], argv[1:]
+    if sub == "build":
+        build(rest)
+    elif sub == "exec":
+        exec_(rest)
+    elif sub == "fetch":
+        print(fetch(rest[0]))
+    elif sub == "version":
+        print("fakesingularity 0.1 (bwrap)")
+    else:
+        die(f"unsupported subcommand: {sub}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

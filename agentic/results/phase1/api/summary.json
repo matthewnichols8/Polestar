@@ -1,0 +1,9 @@
+{
+  "api": {
+    "stream_text": "Hello to you.",
+    "stream_finish": "stop",
+    "tool_choice_none_has_calls": false,
+    "n=2": 400,
+    "bad args": 400
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "base": {
+    "correct": 1.0,
+    "by_level": {
+      "L3": 1.0,
+      "L4": 1.0,
+      "L6": 1.0
+    },
+    "format_ok_given_call": 1.0,
+    "self_tool_response": 1.0,
+    "seconds_per_probe": 2.1875,
+    "n": 4
+  }
+}

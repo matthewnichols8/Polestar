@@ -1,0 +1,19 @@
+# Overrides on top of mini-swe-agent's built-in swebench.yaml, for DiffusionGemma served by
+# /scratch/mi72/agentic-dgemma/server/serve_openai.py. Use:  -c swebench.yaml -c dgemma_swebench.yaml
+# Prompt templates are the built-in ones, unchanged.
+agent:
+  step_limit: 75
+  cost_limit: 0          # off (the local model is free)
+model:
+  model_name: "openai/diffusiongemma"
+  model_kwargs:
+    api_base: "http://127.0.0.1:8011/v1"
+    api_key: "x"
+    max_tokens: 1024     # four 256-token canvases at most
+    timeout: 600
+  litellm_model_registry: "/scratch/mi72/agentic-dgemma/swe/model_registry.json"
+  cost_tracking: "ignore_errors"
+environment:
+  environment_class: singularity
+  executable: "/scratch/mi72/agentic-dgemma/swe/fakesingularity"   # bwrap-backed shim (not written yet)
+  timeout: 120

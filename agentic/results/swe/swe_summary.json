@@ -1,0 +1,121 @@
+{
+  "dgemma-dinfer-swev20": {
+    "resolved": 3,
+    "resolved_ids": [
+      "astropy__astropy-7166",
+      "django__django-13417",
+      "django__django-13741"
+    ],
+    "submitted_patches": 5,
+    "exit_status": {
+      "ContextWindowExceededError": 7,
+      "LimitsExceeded": 1,
+      "RepeatedFormatError": 7,
+      "Submitted": 5
+    },
+    "agent_steps_median": 27.5,
+    "agent_steps_mean": 27.2,
+    "malformed_call_rate": 0.036,
+    "max_prompt_tokens_seen": 23989,
+    "speed_all": {
+      "requests": 854,
+      "ms_per_step": 561.1,
+      "steps_per_request": 20.4,
+      "s_per_request": 11.45,
+      "reuse_share": 0.911,
+      "warm_requests": 793
+    },
+    "speed_prompt_le_18k": {
+      "requests": 694,
+      "ms_per_step": 529.6,
+      "steps_per_request": 19.48,
+      "s_per_request": 10.31,
+      "reuse_share": 0.905,
+      "warm_requests": 642
+    },
+    "cache": null,
+    "commit": null
+  },
+  "dgemma-polestar-cache-swev20": {
+    "resolved": 4,
+    "resolved_ids": [
+      "astropy__astropy-7166",
+      "django__django-11292",
+      "django__django-13741",
+      "scikit-learn__scikit-learn-26323"
+    ],
+    "submitted_patches": 5,
+    "exit_status": {
+      "ContextWindowExceededError": 3,
+      "RepeatedFormatError": 12,
+      "Submitted": 5
+    },
+    "agent_steps_median": 26.0,
+    "agent_steps_mean": 25.7,
+    "malformed_call_rate": 0.056,
+    "max_prompt_tokens_seen": 23903,
+    "speed_all": {
+      "requests": 854,
+      "ms_per_step": 521.6,
+      "steps_per_request": 18.87,
+      "s_per_request": 9.84,
+      "reuse_share": 0.902,
+      "warm_requests": 786
+    },
+    "speed_prompt_le_18k": {
+      "requests": 737,
+      "ms_per_step": 497.8,
+      "steps_per_request": 18.96,
+      "s_per_request": 9.44,
+      "reuse_share": 0.898,
+      "warm_requests": 677
+    },
+    "cache": {
+      "full_steps": 2516,
+      "partial_steps": 13598,
+      "mean_recompute_frac_partial": 0.73,
+      "commit_refreshes": 0
+    },
+    "commit": null
+  },
+  "dgemma-polestar-cache-commit-swev20": {
+    "resolved": 0,
+    "resolved_ids": [],
+    "submitted_patches": 1,
+    "exit_status": {
+      "ContextWindowExceededError": 15,
+      "RepeatedFormatError": 4,
+      "Submitted": 1
+    },
+    "agent_steps_median": 23.5,
+    "agent_steps_mean": 23.9,
+    "malformed_call_rate": 0.055,
+    "max_prompt_tokens_seen": 17973,
+    "speed_all": {
+      "requests": 713,
+      "ms_per_step": 528.0,
+      "steps_per_request": 19.03,
+      "s_per_request": 10.05,
+      "reuse_share": 0.915,
+      "warm_requests": 665
+    },
+    "speed_prompt_le_18k": {
+      "requests": 713,
+      "ms_per_step": 528.0,
+      "steps_per_request": 19.03,
+      "s_per_request": 10.05,
+      "reuse_share": 0.915,
+      "warm_requests": 665
+    },
+    "cache": {
+      "full_steps": 5112,
+      "partial_steps": 8454,
+      "mean_recompute_frac_partial": 0.781,
+      "commit_refreshes": 2978
+    },
+    "commit": {
+      "extra_accepted": 65129,
+      "frozen": 245194
+    }
+  }
+}

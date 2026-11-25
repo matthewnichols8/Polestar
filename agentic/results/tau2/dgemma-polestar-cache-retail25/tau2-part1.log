@@ -1,0 +1,1229 @@
+2026-11-04 19:00:07.454 | DEBUG    | tau2.registry:<module>:297 - Voice dependencies not installed, skipping voice user registration
+╭────────────────────────── Simulation Configuration ──────────────────────────╮
+│ Domain: retail  Task Set: Default  Tasks: All                                │
+│ Trials: 1  Max Steps: 200  Max Errors: 10                                    │
+│                                                                              │
+│ Agent: llm_agent → openai/diffusiongemma                                     │
+│ User:  user_simulator → gpt-4.1                                              │
+│                                                                              │
+│ Save: dgemma-polestar-cache-retail25  Concurrency: 1  Verbose: False         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+0/25 (trial 1/1). Running task 0, trial 1
+2026-11-04 19:00:18.567 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:00:20.736 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:00:22.427 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:00:27.612 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:00:31.519 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 0/25 complete. Avg reward: N/A. 1 running: 0.0(30s)
+2026-11-04 19:00:40.805 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:00:43.970 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:00:51.947 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 0                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 43.93s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0105                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_order_details [read] ✅ 1.0                                   │
+│ - 2: agent get_product_details [read] ✅ 1.0                                 │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 5/5 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+1/25 (trial 1/1). Running task 1, trial 1
+2026-11-04 19:01:05.497 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:07.181 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 1/25 complete. Avg reward: 1.00 (N=1). 1 running: 1.0(14s)
+2026-11-04 19:01:10.107 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:11.457 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:13.663 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:24.395 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:29.992 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:32.515 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:36.911 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 1/25 complete. Avg reward: 1.00 (N=1). 1 running: 1.0(44s)
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 1                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 42.72s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0123                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_order_details [read] ✅ 1.0                                   │
+│ - 2: agent get_product_details [read] ✅ 1.0                                 │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 5/5 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+2/25 (trial 1/1). Running task 2, trial 1
+2026-11-04 19:01:49.161 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:51.465 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:53.213 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:01:56.113 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:00.271 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:05.258 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 2/25 complete. Avg reward: 1.00 (N=2). 1 running: 2.0(30s)
+2026-11-04 19:02:08.444 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:17.469 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:21.979 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:24.858 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:28.768 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 2                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 50.08s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0151                                                           │
+│ Reward: ❌ 0.0000 (DB: 1.0, NL_ASSERTION: 0.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_product_details [read] ❌ 0.0                                 │
+│ - 2: agent get_product_details [read] ✅ 1.0                                 │
+│ - 3: agent get_user_details [read] ✅ 1.0                                    │
+│ - 4: agent get_order_details [read] ✅ 1.0                                   │
+│ - 5: agent get_order_details [read] ✅ 1.0                                   │
+│ - 6: agent get_order_details [read] ✅ 1.0                                   │
+│ - 7: agent get_order_details [read] ✅ 1.0                                   │
+│ - 8: agent get_order_details [read] ✅ 1.0                                   │
+│ - 9: agent get_product_details [read] ✅ 1.0                                 │
+│ - 10: agent return_delivered_order_items [write] ❌ 0.0                      │
+│                                                                              │
+│ Partial Action Reward: 9/11 (81.8%)                                          │
+│   Read:  9/10 (90.0%)                                                        │
+│   Write: 0/1 (0.0%)                                                          │
+│                                                                              │
+│ NL Assertions:                                                               │
+│ - 0: Agent should tell the user that there are 10 t-shirt options available. │
+│ ❌                                                                           │
+│         The agent told the user there were 12 different t-shirt options      │
+│ available, not 10.                                                           │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: None                                                                     │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+3/25 (trial 1/1). Running task 3, trial 1
+Status: 3/25 complete. Avg reward: 0.67 (N=3). 1 running: 3.0(6s)
+2026-11-04 19:02:42.002 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:46.144 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:47.504 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:49.220 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:51.760 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:02:58.077 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:00.992 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 3/25 complete. Avg reward: 0.67 (N=3). 1 running: 3.0(36s)
+2026-11-04 19:03:10.294 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:13.159 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:16.785 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:21.321 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 3                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 49.12s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0115                                                           │
+│ Reward: ❌ 0.0000 (DB: 1.0, NL_ASSERTION: 0.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_product_details [read] ❌ 0.0                                 │
+│ - 2: agent get_product_details [read] ✅ 1.0                                 │
+│ - 3: agent get_user_details [read] ✅ 1.0                                    │
+│ - 4: agent get_order_details [read] ✅ 1.0                                   │
+│ - 5: agent get_order_details [read] ✅ 1.0                                   │
+│ - 6: agent get_order_details [read] ✅ 1.0                                   │
+│ - 7: agent get_order_details [read] ✅ 1.0                                   │
+│ - 8: agent get_order_details [read] ✅ 1.0                                   │
+│ - 9: agent get_product_details [read] ✅ 1.0                                 │
+│ - 10: agent get_user_details [read] ✅ 1.0                                   │
+│ - 11: agent modify_pending_order_items [write] ✅ 1.0                        │
+│                                                                              │
+│ Partial Action Reward: 11/12 (91.7%)                                         │
+│   Read:  10/11 (90.9%)                                                       │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ NL Assertions:                                                               │
+│ - 0: Agent should tell the user that there are 10 t-shirt options available. │
+│ ❌                                                                           │
+│         The agent stated that there were 11 different T-Shirt variants       │
+│ available, not 10. This does not satisfy the expected outcome.               │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: None                                                                     │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+4/25 (trial 1/1). Running task 4, trial 1
+2026-11-04 19:03:34.619 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:37.009 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 4/25 complete. Avg reward: 0.50 (N=4). 1 running: 4.0(14s)
+2026-11-04 19:03:38.698 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:40.793 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:47.161 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:49.844 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:03:58.101 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:00.521 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 4/25 complete. Avg reward: 0.50 (N=4). 1 running: 4.0(44s)
+2026-11-04 19:04:08.972 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:13.062 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:18.558 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 4                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 55.47s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0121                                                           │
+│ Reward: ❌ 0.0000 (DB: 1.0, NL_ASSERTION: 0.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_product_details [read] ❌ 0.0                                 │
+│ - 2: agent get_product_details [read] ✅ 1.0                                 │
+│ - 3: agent get_user_details [read] ✅ 1.0                                    │
+│ - 4: agent get_order_details [read] ✅ 1.0                                   │
+│ - 5: agent get_order_details [read] ✅ 1.0                                   │
+│ - 6: agent get_order_details [read] ✅ 1.0                                   │
+│ - 7: agent get_order_details [read] ✅ 1.0                                   │
+│ - 8: agent get_order_details [read] ✅ 1.0                                   │
+│ - 9: agent get_product_details [read] ✅ 1.0                                 │
+│ - 10: agent get_user_details [read] ✅ 1.0                                   │
+│ - 11: agent modify_pending_order_items [write] ✅ 1.0                        │
+│ - 12: agent modify_pending_order_items [write] ✅ 1.0                        │
+│                                                                              │
+│ Partial Action Reward: 12/13 (92.3%)                                         │
+│   Read:  10/11 (90.9%)                                                       │
+│   Write: 2/2 (100.0%)                                                        │
+│                                                                              │
+│ NL Assertions:                                                               │
+│ - 0: Agent should tell the user that there are 10 t-shirt options available. │
+│ ❌                                                                           │
+│         The inventory shown includes 10 available T-shirt variants, but the  │
+│ agent never explicitly told the user that there are 10 T-shirt options       │
+│ available.                                                                   │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: None                                                                     │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+5/25 (trial 1/1). Running task 5, trial 1
+2026-11-04 19:04:34.745 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:36.889 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:37.955 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 5/25 complete. Avg reward: 0.40 (N=5). 1 running: 5.0(14s)
+2026-11-04 19:04:41.837 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:44.250 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:49.084 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:52.480 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:04:59.294 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:01.942 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 5/25 complete. Avg reward: 0.40 (N=5). 1 running: 5.0(44s)
+2026-11-04 19:05:10.578 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:18.327 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:23.186 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:28.305 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:30.797 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:34.291 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 5                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 69.78s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0184                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent return_delivered_order_items [write] ✅ 1.0                       │
+│                                                                              │
+│ Partial Action Reward: 5/5 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+6/25 (trial 1/1). Running task 6, trial 1
+Status: 6/25 complete. Avg reward: 0.50 (N=6). 1 running: 6.0(3s)
+2026-11-04 19:05:45.511 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:48.807 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:49.897 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:53.600 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:05:56.044 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:02.836 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:05.712 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 6/25 complete. Avg reward: 0.50 (N=6). 1 running: 6.0(33s)
+2026-11-04 19:06:14.103 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:20.186 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:23.534 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:27.309 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 6                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 51.79s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0154                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent get_product_details [read] ✅ 1.0                                 │
+│ - 5: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 6/6 (100.0%)                                          │
+│   Read:  5/5 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+7/25 (trial 1/1). Running task 7, trial 1
+Status: 7/25 complete. Avg reward: 0.57 (N=7). 1 running: 7.0(9s)
+2026-11-04 19:06:39.062 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:41.537 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:42.623 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:45.832 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:48.957 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:55.962 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:06:58.350 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:06.833 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 7/25 complete. Avg reward: 0.57 (N=7). 1 running: 7.0(39s)
+2026-11-04 19:07:09.981 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:14.153 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:18.251 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:20.489 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:24.649 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 7                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 54.85s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0179                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent get_product_details [read] ✅ 1.0                                 │
+│ - 5: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 6/6 (100.0%)                                          │
+│   Read:  5/5 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+8/25 (trial 1/1). Running task 8, trial 1
+2026-11-04 19:07:35.746 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 8/25 complete. Avg reward: 0.62 (N=8). 1 running: 8.0(12s)
+2026-11-04 19:07:38.431 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:39.813 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:42.723 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:45.490 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:52.248 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:07:54.803 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 8/25 complete. Avg reward: 0.62 (N=8). 1 running: 8.0(42s)
+2026-11-04 19:08:08.433 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:14.637 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:17.576 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:21.330 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 8                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 54.80s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0149                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent get_product_details [read] ✅ 1.0                                 │
+│ - 5: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 6/6 (100.0%)                                          │
+│   Read:  5/5 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+9/25 (trial 1/1). Running task 9, trial 1
+2026-11-04 19:08:32.759 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:34.997 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:36.404 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 9/25 complete. Avg reward: 0.67 (N=9). 1 running: 9.0(16s)
+2026-11-04 19:08:40.014 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:42.331 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:49.693 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:53.245 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:08:58.994 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:05.585 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:08.166 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 9/25 complete. Avg reward: 0.67 (N=9). 1 running: 9.0(46s)
+2026-11-04 19:09:12.730 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 9                                                                   │
+│ Trial: 0                                                                     │
+│ Duration: 49.97s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0140                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_product_details [read] ❌ 0.0                                 │
+│ - 4: agent get_product_details [read] ✅ 1.0                                 │
+│ - 5: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 5/6 (83.3%)                                           │
+│   Read:  4/5 (80.0%)                                                         │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+10/25 (trial 1/1). Running task 10, trial 1
+2026-11-04 19:09:24.572 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:26.711 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:27.792 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:33.073 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:37.912 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 10/25 complete. Avg reward: 0.70 (N=10). 1 running: 10.0(24s)
+2026-11-04 19:09:39.015 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 10                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 24.36s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0074                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_email [read] ✅ 1.0                               │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ❌ 0.0                                   │
+│ - 3: agent get_order_details [read] ❌ 0.0                                   │
+│ - 4: agent transfer_to_human_agents [generic] ✅ 1.0                         │
+│                                                                              │
+│ Partial Action Reward: 3/5 (60.0%)                                           │
+│   Read:  2/4 (50.0%)                                                         │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+11/25 (trial 1/1). Running task 11, trial 1
+2026-11-04 19:09:50.065 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:52.037 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:53.472 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:09:57.664 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:02.033 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:06.675 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 11/25 complete. Avg reward: 0.73 (N=11). 1 running: 11.0(28s)
+2026-11-04 19:10:11.666 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:15.096 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:20.733 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:23.361 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:27.601 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:31.391 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 11                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 51.08s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0143                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_email [read] ✅ 1.0                               │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent return_delivered_order_items [write] ✅ 1.0                       │
+│ - 5: agent return_delivered_order_items [write] ✅ 1.0                       │
+│                                                                              │
+│ Partial Action Reward: 6/6 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 2/2 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+12/25 (trial 1/1). Running task 12, trial 1
+Status: 12/25 complete. Avg reward: 0.75 (N=12). 1 running: 12.0(5s)
+2026-11-04 19:10:42.334 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:44.332 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:45.735 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:49.589 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:51.725 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:10:58.327 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:04.841 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:07.472 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 12/25 complete. Avg reward: 0.75 (N=12). 1 running: 12.0(35s)
+2026-11-04 19:11:10.384 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:14.305 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:15.420 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 12                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 41.96s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0142                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_email [read] ✅ 1.0                               │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent transfer_to_human_agents [generic] ✅ 1.0                         │
+│                                                                              │
+│ Partial Action Reward: 5/5 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+13/25 (trial 1/1). Running task 13, trial 1
+2026-11-04 19:11:26.914 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:28.932 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:30.669 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:35.428 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:37.571 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 13/25 complete. Avg reward: 0.77 (N=13). 1 running: 13.0(22s)
+2026-11-04 19:11:42.546 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:47.717 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:49.895 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:53.763 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:11:57.378 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 13                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 40.26s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0144                                                           │
+│ Reward: ❌ 0.0000 (DB: 0.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:❌ 0.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_email [read] ✅ 1.0                               │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent return_delivered_order_items [write] ❌ 0.0                       │
+│                                                                              │
+│ Partial Action Reward: 4/5 (80.0%)                                           │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 0/1 (0.0%)                                                          │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+14/25 (trial 1/1). Running task 14, trial 1
+Status: 14/25 complete. Avg reward: 0.71 (N=14). 1 running: 14.0(10s)
+2026-11-04 19:12:08.769 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:10.393 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:12.152 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:16.333 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:18.810 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:24.250 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:29.344 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:31.866 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 14/25 complete. Avg reward: 0.71 (N=14). 1 running: 14.0(40s)
+2026-11-04 19:12:39.673 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:12:43.020 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 14                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 51.61s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0125                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_email [read] ✅ 1.0                               │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent return_delivered_order_items [write] ✅ 1.0                       │
+│ - 5: agent return_delivered_order_items [write] ✅ 1.0                       │
+│                                                                              │
+│ Partial Action Reward: 6/6 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 2/2 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+15/25 (trial 1/1). Running task 15, trial 1
+2026-11-04 19:13:06.417 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 15/25 complete. Avg reward: 0.73 (N=15). 1 running: 15.0(16s)
+2026-11-04 19:13:08.701 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:10.483 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:12.972 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:15.582 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:23.493 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:26.076 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:33.515 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:36.975 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 15/25 complete. Avg reward: 0.73 (N=15). 1 running: 15.0(46s)
+2026-11-04 19:13:40.198 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 15                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 47.76s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0135                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent get_order_details [read] ✅ 1.0                                   │
+│ - 5: agent get_product_details [read] ✅ 1.0                                 │
+│ - 6: agent modify_pending_order_items [write] ✅ 1.0                         │
+│                                                                              │
+│ Partial Action Reward: 7/7 (100.0%)                                          │
+│   Read:  6/6 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+16/25 (trial 1/1). Running task 16, trial 1
+2026-11-04 19:13:51.969 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:54.078 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:55.143 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:13:57.199 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:07.586 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 16/25 complete. Avg reward: 0.75 (N=16). 1 running: 16.0(27s)
+2026-11-04 19:14:11.377 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:18.964 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:21.564 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 16                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 39.49s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0095                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent get_order_details [read] ✅ 1.0                                   │
+│ - 5: agent calculate [generic] ❌ 0.0                                        │
+│ - 6: agent cancel_pending_order [write] ✅ 1.0                               │
+│ - 7: agent cancel_pending_order [write] ✅ 1.0                               │
+│ - 8: agent return_delivered_order_items [write] ✅ 1.0                       │
+│                                                                              │
+│ Partial Action Reward: 8/9 (88.9%)                                           │
+│   Read:  5/5 (100.0%)                                                        │
+│   Write: 3/3 (100.0%)                                                        │
+│                                                                              │
+│ NL Assertions:                                                               │
+│ - 0: Agent should tell the user the total refund amount is $8,276.23. ✅     │
+│         The assistant explicitly stated that the total amount the user would │
+│ receive back is $8,276.23.                                                   │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: None                                                                     │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+17/25 (trial 1/1). Running task 17, trial 1
+2026-11-04 19:14:34.001 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:36.108 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:37.480 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 17/25 complete. Avg reward: 0.76 (N=17). 1 running: 17.0(14s)
+2026-11-04 19:14:40.394 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:42.985 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:46.697 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:14:49.290 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 17                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 24.27s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0090                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ❌ 0.0                                    │
+│ - 2: agent get_order_details [read] ❌ 0.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent get_order_details [read] ❌ 0.0                                   │
+│ - 5: agent modify_pending_order_address [write] ✅ 1.0                       │
+│                                                                              │
+│ Partial Action Reward: 3/6 (50.0%)                                           │
+│   Read:  2/5 (40.0%)                                                         │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+18/25 (trial 1/1). Running task 18, trial 1
+2026-11-04 19:15:00.239 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:02.580 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:04.016 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:06.816 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 18/25 complete. Avg reward: 0.78 (N=18). 1 running: 18.0(18s)
+2026-11-04 19:15:08.642 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:13.288 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:20.244 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:22.024 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:26.488 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:32.284 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:34.902 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:38.060 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 18/25 complete. Avg reward: 0.78 (N=18). 1 running: 18.0(48s)
+2026-11-04 19:15:40.441 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 18                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 49.55s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0168                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_product_details [read] ✅ 1.0                                 │
+│ - 4: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│                                                                              │
+│ Partial Action Reward: 5/5 (100.0%)                                          │
+│   Read:  4/4 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+19/25 (trial 1/1). Running task 19, trial 1
+2026-11-04 19:15:51.766 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:54.072 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:55.184 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:15:58.155 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:01.696 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:07.569 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 19/25 complete. Avg reward: 0.79 (N=19). 1 running: 19.0(27s)
+2026-11-04 19:16:14.102 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:19.754 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:21.335 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:27.210 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:34.499 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:36.992 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 19/25 complete. Avg reward: 0.79 (N=19). 1 running: 19.0(57s)
+2026-11-04 19:16:45.277 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:48.667 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:16:53.243 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 19                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 71.19s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0129                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent get_product_details [read] ✅ 1.0                                 │
+│ - 5: agent get_product_details [read] ✅ 1.0                                 │
+│ - 6: agent return_delivered_order_items [write] ✅ 1.0                       │
+│                                                                              │
+│ Partial Action Reward: 7/7 (100.0%)                                          │
+│   Read:  6/6 (100.0%)                                                        │
+│   Write: 1/1 (100.0%)                                                        │
+│                                                                              │
+│ NL Assertions:                                                               │
+│ - 0: Agent should tell the user that returning the water bottle gives a      │
+│ refund of $54.04. ✅                                                         │
+│         The agent explicitly stated that returning the water bottle would    │
+│ save/refund $54.04.                                                          │
+│ - 1: Agent should tell the user that exchanging the pet bed and office chair │
+│ saves $41.64 total. ✅                                                       │
+│         The agent calculated and stated the total exchange savings as $41.64 │
+│ for the pet bed and office chair combined.                                   │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: None                                                                     │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+20/25 (trial 1/1). Running task 20, trial 1
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(12s)
+2026-11-04 19:17:09.924 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:11.866 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:13.295 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:17.305 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:19.620 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:23.197 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:25.377 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:35.584 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(42s)
+2026-11-04 19:17:41.232 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:47.957 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:17:51.753 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 19:18:08.261 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(72s)
+2026-11-04 19:18:12.038 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(102s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(132s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(162s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(192s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(222s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(252s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(282s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(312s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(342s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(372s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(402s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(432s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(462s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(492s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(522s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(552s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(582s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(612s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(642s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(672s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(702s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(732s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(762s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(792s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(822s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(852s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(882s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(912s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(942s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(972s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1002s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1032s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1062s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1092s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1122s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1152s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1182s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1212s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1242s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1272s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1302s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1332s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1362s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1392s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1422s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1452s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1482s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1512s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1542s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1572s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1602s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1632s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1662s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1692s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1722s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1752s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1782s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1812s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1842s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1872s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1902s)
+Status: 20/25 complete. Avg reward: 0.80 (N=20). 1 running: 20.0(1932s)

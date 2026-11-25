@@ -1,0 +1,7 @@
+{"label": "dgemma-polestar-cache-swev20", "model": "google/diffusiongemma-26B-A4B-it", "expert_dtype": "int8", "gpus": "2x TITAN RTX",
+ "server_flags": "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True --gpus 0,1 --port 8011 --dist-port 29711 --cache-slots 1 --default-max-tokens 1024 --max-prompt-tokens 24000 --polestar --polestar-topk 2 --polestar-refresh-every 8",
+ "polestar_repo_commit": "6c124e6", "polestar_repo_branch": "feature/dgemma-polestar",
+ "agent": "mini-swe-agent 2.4.6",
+ "agent_config": "swebench.yaml + /scratch/mi72/agentic-dgemma/swe/dgemma_swebench.yaml (step_limit 75, max_tokens 1024)",
+ "environment": "fakesingularity (bwrap over unpacked swebench/sweb.eval images)",
+ "benchmark": "SWE-bench Verified, 20 instances (seed 42, /scratch/mi72/agentic-dgemma/swe/instances.txt)", "scoring": "eval_bwrap.py (local)"}

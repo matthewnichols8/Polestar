@@ -1,0 +1,87 @@
+[probes s0] L1-weather               PASS ok                           finish=tool_calls reused=0   1.0s
+[probes s0] L1-calc                  PASS ok                           finish=tool_calls reused=0   0.9s
+[probes s0] L2-select                PASS ok                           finish=tool_calls reused=0   1.0s
+[probes s0] L2-no-call               PASS ok                           finish=stop       reused=0   8.2s
+[probes s0] L2-no-call-known         PASS ok                           finish=stop       reused=0   0.9s
+[probes s0] L3-arrays                PASS ok                           finish=tool_calls reused=0   2.3s
+[probes s0] L3-enum                  PASS ok                           finish=tool_calls reused=0   2.2s
+[probes s0] L4-chain                 PASS ok                           finish=tool_calls reused=0   1.8s
+[probes s0] L4-answer-from-result    PASS ok                           finish=stop       reused=0   2.2s
+[probes s0] L5-auth-first            PASS ok                           finish=stop       reused=0   3.2s
+[probes s0] L5-confirm-before-write  PASS ok                           finish=stop       reused=0   2.6s
+[probes s0] L5-refuse-delivered      PASS ok                           finish=stop       reused=0   4.2s
+[probes s0] L6-bash-explore          PASS ok                           finish=tool_calls reused=0   1.2s
+[probes s0] L6-bash-edit             PASS ok                           finish=tool_calls reused=0   1.9s
+[probes s0] L7-long-policy           PASS ok                           finish=tool_calls reused=0   6.0s
+[probes s1] L1-weather               PASS ok                           finish=tool_calls reused=0   0.9s
+[probes s1] L1-calc                  PASS ok                           finish=tool_calls reused=0   0.9s
+[probes s1] L2-select                PASS ok                           finish=tool_calls reused=0   1.0s
+[probes s1] L2-no-call               PASS ok                           finish=stop       reused=0   8.4s
+[probes s1] L2-no-call-known         PASS ok                           finish=stop       reused=0   0.9s
+[probes s1] L3-arrays                PASS ok                           finish=tool_calls reused=0   2.3s
+[probes s1] L3-enum                  PASS ok                           finish=tool_calls reused=0   2.2s
+[probes s1] L4-chain                 PASS ok                           finish=tool_calls reused=0   1.8s
+[probes s1] L4-answer-from-result    PASS ok                           finish=stop       reused=0   2.3s
+[probes s1] L5-auth-first            PASS ok                           finish=stop       reused=0   2.9s
+[probes s1] L5-confirm-before-write  PASS ok                           finish=stop       reused=0   2.3s
+[probes s1] L5-refuse-delivered      PASS ok                           finish=stop       reused=0   3.3s
+[probes s1] L6-bash-explore          PASS ok                           finish=tool_calls reused=0   1.3s
+[probes s1] L6-bash-edit             PASS ok                           finish=tool_calls reused=0   1.9s
+[probes s1] L7-long-policy           PASS ok                           finish=tool_calls reused=0   6.0s
+[probes s2] L1-weather               PASS ok                           finish=tool_calls reused=0   0.9s
+[probes s2] L1-calc                  PASS ok                           finish=tool_calls reused=0   0.9s
+[probes s2] L2-select                PASS ok                           finish=tool_calls reused=0   1.0s
+[probes s2] L2-no-call               PASS ok                           finish=stop       reused=0   8.1s
+[probes s2] L2-no-call-known         PASS ok                           finish=stop       reused=0   0.9s
+[probes s2] L3-arrays                PASS ok                           finish=tool_calls reused=0   2.3s
+[probes s2] L3-enum                  PASS ok                           finish=tool_calls reused=0   2.2s
+[probes s2] L4-chain                 PASS ok                           finish=tool_calls reused=0   1.8s
+[probes s2] L4-answer-from-result    PASS ok                           finish=stop       reused=0   2.6s
+[probes s2] L5-auth-first            PASS ok                           finish=stop       reused=0   4.0s
+[probes s2] L5-confirm-before-write  PASS ok                           finish=stop       reused=0   3.0s
+[probes s2] L5-refuse-delivered      PASS ok                           finish=stop       reused=0   2.9s
+[probes s2] L6-bash-explore          PASS ok                           finish=tool_calls reused=0   1.3s
+[probes s2] L6-bash-edit             PASS ok                           finish=tool_calls reused=0   2.3s
+[probes s2] L7-long-policy           PASS ok                           finish=tool_calls reused=0   6.1s
+[probes] 45/45 correct
+[multiturn reuse   ] turn  0 prompt=    63 reused=     0 steps=  9   3.20s
+[multiturn reuse   ] turn  1 prompt=   337 reused=    63 steps=  8   3.23s
+[multiturn reuse   ] turn  2 prompt=  1318 reused=   337 steps= 12   5.48s
+[multiturn reuse   ] turn  3 prompt=  3034 reused=  1318 steps= 10   5.94s
+[multiturn reuse   ] turn  4 prompt=  4862 reused=  3034 steps= 13   7.66s
+[multiturn reuse   ] turn  5 prompt=  6710 reused=  4862 steps= 13   7.99s
+[multiturn reuse   ] turn  6 prompt=  8621 reused=  6710 steps= 18  10.87s
+[multiturn reuse   ] turn  7 prompt=  9926 reused=  8621 steps= 14   8.20s
+[multiturn reuse   ] turn  8 prompt= 11927 reused=  9926 steps= 18  11.84s
+[multiturn no_reuse] turn  0 prompt=    63 reused=     0 steps=  7   2.58s
+[multiturn no_reuse] turn  1 prompt=   337 reused=     0 steps=  5   2.26s
+[multiturn no_reuse] turn  2 prompt=  1318 reused=     0 steps= 12   6.08s
+[multiturn no_reuse] turn  3 prompt=  3034 reused=     0 steps= 12   8.33s
+[multiturn no_reuse] turn  4 prompt=  4862 reused=     0 steps= 15  12.26s
+[multiturn no_reuse] turn  5 prompt=  6710 reused=     0 steps= 14  14.92s
+[multiturn no_reuse] turn  6 prompt=  8621 reused=     0 steps= 15  18.40s
+[multiturn no_reuse] turn  7 prompt=  9926 reused=     0 steps= 15  20.66s
+[multiturn no_reuse] turn  8 prompt= 11927 reused=     0 steps= 18  26.08s
+{
+  "probes": {
+    "correct": 45,
+    "n": 45,
+    "finish_reasons": {
+      "stop": 18,
+      "tool_calls": 27
+    },
+    "failures": []
+  },
+  "multiturn": {
+    "reuse": {
+      "total_seconds": 64.4,
+      "last_turn_seconds": 11.84,
+      "last_prompt_tokens": 11927
+    },
+    "no_reuse": {
+      "total_seconds": 111.6,
+      "last_turn_seconds": 26.08,
+      "last_prompt_tokens": 11927
+    }
+  }
+}

@@ -1,0 +1,147 @@
+2026-11-04 20:00:24.713 | DEBUG    | tau2.registry:<module>:297 - Voice dependencies not installed, skipping voice user registration
+╭────────────────────────── Simulation Configuration ──────────────────────────╮
+│ Domain: retail  Task Set: Default  Tasks: 23, 24                             │
+│ Trials: 1  Max Steps: 200  Max Errors: 10                                    │
+│                                                                              │
+│ Agent: llm_agent → openai/diffusiongemma                                     │
+│ User:  user_simulator → gpt-4.1                                              │
+│                                                                              │
+│ Save: dgemma-polestar-cache-retail25-part3  Concurrency: 1  Verbose: False   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+0/2 (trial 1/1). Running task 23, trial 1
+2026-11-04 20:00:35.818 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:00:38.046 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:00:41.096 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:00:43.086 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:00:47.333 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:00:50.000 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 0/2 complete. Avg reward: N/A. 1 running: 23.0(30s)
+2026-11-04 20:01:02.526 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:01:10.591 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:01:12.859 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:01:23.676 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 0/2 complete. Avg reward: N/A. 1 running: 23.0(60s)
+2026-11-04 20:01:28.925 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:01:37.536 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 23                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 71.60s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0166                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ Action Checks:                                                               │
+│ - 0: agent find_user_id_by_name_zip [read] ✅ 1.0                            │
+│ - 1: agent get_user_details [read] ✅ 1.0                                    │
+│ - 2: agent get_order_details [read] ✅ 1.0                                   │
+│ - 3: agent get_order_details [read] ✅ 1.0                                   │
+│ - 4: agent get_order_details [read] ✅ 1.0                                   │
+│ - 5: agent get_order_details [read] ✅ 1.0                                   │
+│ - 6: agent get_product_details [read] ✅ 1.0                                 │
+│ - 7: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│ - 8: agent get_product_details [read] ✅ 1.0                                 │
+│ - 9: agent exchange_delivered_order_items [write] ✅ 1.0                     │
+│ - 10: agent get_product_details [read] ✅ 1.0                                │
+│ - 11: agent modify_pending_order_items [write] ✅ 1.0                        │
+│                                                                              │
+│ Partial Action Reward: 12/12 (100.0%)                                        │
+│   Read:  9/9 (100.0%)                                                        │
+│   Write: 3/3 (100.0%)                                                        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: {'note': 'No nl_assertions to evaluate'}                                 │
+│ communicate: None                                                            │
+│ action: None                                                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+1/2 (trial 1/1). Running task 24, trial 1
+2026-11-04 20:01:48.850 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:01:51.129 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:01:52.203 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:01:55.564 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+Status: 1/2 complete. Avg reward: 1.00 (N=1). 1 running: 24.0(17s)
+2026-11-04 20:01:57.530 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:02:02.312 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+2026-11-04 20:02:07.643 | ERROR    | tau2.utils.llm_utils:get_response_cost:156 - This model isn't mapped yet. model=diffusiongemma, custom_llm_provider=openai. Add it here - https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json.
+
+╭──────────────────────────── Simulation Overview ─────────────────────────────╮
+│ Task ID: 24                                                                  │
+│ Trial: 0                                                                     │
+│ Duration: 28.38s                                                             │
+│ Mode: half_duplex                                                            │
+│ Termination Reason: TerminationReason.USER_STOP                              │
+│ User Cost: $0.0111                                                           │
+│ Reward: ✅ 1.0000 (DB: 1.0, NL_ASSERTION: 1.0)                               │
+│                                                                              │
+│ DB Check:✅ 1.0                                                              │
+│                                                                              │
+│ NL Assertions:                                                               │
+│ - 0: Agent should tell the user the materials of the two t-shirts are        │
+│ polyester and cotton. ✅                                                     │
+│         The agent identified both t-shirts and stated their materials: the   │
+│ blue t-shirt is cotton and the black t-shirt is polyester. This satisfies    │
+│ the expectation, even though the order of the materials was reversed.        │
+│                                                                              │
+│ Additional Info:                                                             │
+│ env: None                                                                    │
+│ nl: None                                                                     │
+│ communicate: None                                                            │
+│ action: {'note': 'No actions to evaluate'}                                   │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+Successfully completed all simulations!
+To review the simulations, run: tau2 view
+╭───────────────────────── Agent Performance Metrics ──────────────────────────╮
+│   ═══ Overview ═══                                                           │
+│   Total Simulations         2                                                │
+│   Total Tasks               2                                                │
+│                                                                              │
+│   ═══ Reward Metrics ═══                                                     │
+│   🏆 Average Reward         1.0000                                           │
+│      Pass^1                 1.000                                            │
+│   💰 Avg Cost/Conversation  n/a                                              │
+│                                                                              │
+│   ═══ Action Metrics ═══                                                     │
+│   📖 Read Actions           9/9 (100.0%)                                     │
+│   ✏️  Write Actions         3/3 (100.0%)                                     │
+│                                                                              │
+│   ═══ DB Match ═══                                                           │
+│   🗄️  DB Match              ✓ 2 / ✗ 0 (100.0%)                               │
+│                                                                              │
+│   ═══ Authentication ═══                                                     │
+│      Not Checked            2                                                │
+│                                                                              │
+│   ═══ Termination ═══                                                        │
+│   🛑 Normal Stop            2 (👤 2 / 🤖 0)                                  │
+│                                                                              │
+│   ═══ LLM Judge Review ═══                                                   │
+│   🤖 Agent Errors           0 errors                                         │
+│      Sims by severity       -                                                │
+│   👤 User Errors            0 errors                                         │
+│      Sims by severity       -                                                │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯

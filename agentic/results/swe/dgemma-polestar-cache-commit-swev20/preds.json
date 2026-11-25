@@ -1,0 +1,102 @@
+{
+  "astropy__astropy-14508": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "astropy__astropy-14508",
+    "model_patch": ""
+  },
+  "astropy__astropy-14995": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "astropy__astropy-14995",
+    "model_patch": ""
+  },
+  "astropy__astropy-7166": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "astropy__astropy-7166",
+    "model_patch": ""
+  },
+  "django__django-11292": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11292",
+    "model_patch": ""
+  },
+  "django__django-11400": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11400",
+    "model_patch": ""
+  },
+  "django__django-11532": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11532",
+    "model_patch": ""
+  },
+  "django__django-11734": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-11734",
+    "model_patch": ""
+  },
+  "django__django-12125": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-12125",
+    "model_patch": ""
+  },
+  "django__django-13401": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-13401",
+    "model_patch": "diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py\nindex 28374272f4..a435e9e8e8 100755\n--- a/django/db/models/fields/__init__.py\n+++ b/django/db/models/fields/__init__.py\n@@ -516,18 +516,20 @@ class Field(RegisterLookupMixin):\n     def __eq__(self, other):\n         # Needed for @total_ordering\n         if isinstance(other, Field):\n-            return self.creation_counter == other.creation_counter\n+            return (self.creation_counter == other.creation_counter and\n+                    self.model == other.model)\n         return NotImplemented\n \n     def __lt__(self, other):\n         # This is needed because bisect does not take a comparison function.\n         if isinstance(other, Field):\n-            return self.creation_counter < other.creation_counter\n+            if self.creation_counter != other.creation_counter:\n+                return self.creation_counter < other.creation_counter\n+            return self.model < other.model\n         return NotImplemented\n \n     def __hash__(self):\n-        return hash(self.creation_counter)\n-\n+        return hash((self.creation_counter, self.model))\n     def __deepcopy__(self, memodict):\n         # We don't have to deepcopy very much here, since most things are not\n         # intended to be altered after initial creation.\n"
+  },
+  "django__django-13417": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-13417",
+    "model_patch": ""
+  },
+  "django__django-13741": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-13741",
+    "model_patch": ""
+  },
+  "django__django-14034": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-14034",
+    "model_patch": ""
+  },
+  "django__django-16100": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "django__django-16100",
+    "model_patch": ""
+  },
+  "matplotlib__matplotlib-25479": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "matplotlib__matplotlib-25479",
+    "model_patch": ""
+  },
+  "pydata__xarray-3677": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "pydata__xarray-3677",
+    "model_patch": ""
+  },
+  "pylint-dev__pylint-7080": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "pylint-dev__pylint-7080",
+    "model_patch": ""
+  },
+  "pytest-dev__pytest-7571": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "pytest-dev__pytest-7571",
+    "model_patch": ""
+  },
+  "scikit-learn__scikit-learn-25973": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "scikit-learn__scikit-learn-25973",
+    "model_patch": ""
+  },
+  "scikit-learn__scikit-learn-26323": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "scikit-learn__scikit-learn-26323",
+    "model_patch": ""
+  },
+  "sympy__sympy-16766": {
+    "model_name_or_path": "openai/diffusiongemma",
+    "instance_id": "sympy__sympy-16766",
+    "model_patch": ""
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "probes": {
+    "correct": 45,
+    "n": 45,
+    "finish_reasons": {
+      "stop": 18,
+      "tool_calls": 27
+    },
+    "failures": []
+  },
+  "multiturn": {
+    "reuse": {
+      "total_seconds": 64.4,
+      "last_turn_seconds": 11.84,
+      "last_prompt_tokens": 11927
+    },
+    "no_reuse": {
+      "total_seconds": 111.6,
+      "last_turn_seconds": 26.08,
+      "last_prompt_tokens": 11927
+    }
+  }
+}

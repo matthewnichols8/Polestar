@@ -1,0 +1,10 @@
+Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files:   0%|          | 0/22 [00:00<?, ?it/s]Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 1841.66it/s]
+Fetching 22 files: 100%|██████████| 22/22 [00:00<00:00, 1730.13it/s]
+experts 0-63: int8, all 30 layers on GPU
+[base s0] L3-arrays                PASS  ok                               stop=self_tool_response   4 steps   2.6s
+[base s0] L3-enum                  PASS  ok                               stop=self_tool_response   3 steps   2.2s
+[base s0] L4-chain                 PASS  ok                               stop=self_tool_response   3 steps   2.2s
+[base s0] L6-bash-edit             PASS  ok                               stop=self_tool_response   4 steps   1.9s
+| config | correct | L3 | L4 | L6 | format ok (calls) | self tool_response | s/probe |
+|---|---|---|---|---|---|---|---|
+| base | 100% | 100% | 100% | 100% | 100% | 100% | 2.2 |
